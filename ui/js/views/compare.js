@@ -86,7 +86,7 @@ function draw({ el, arg }) {
     if (l.group !== lastGroup) { lastGroup = l.group; stats.push(h('tr', { class: 'grp sub' }, h('td', { colspan: players.length + 1 }, l.group))); }
     stats.push(h('tr', null, h('th', { scope: 'row' }, l.def.name),
       l.vals.map((v, i) => h('td', { class: l.winners[i] ? (leads[i] ? 'best lead' : 'best') : '' },
-        v == null ? '\u2013' : h('span', { class: 'cmp-val' },
+        v == null ? '\u2013' : h('span', { class: `cmp-val ${l.winners[i] && l.max > 0 && l.nums[i] / l.max >= 0.6 ? 'on-bar' : ''}` },
           !l.def.plain && l.nums[i] != null && l.max > 0 ? h('i', { class: 'cmp-bar', style: { width: `${Math.max(2, Math.round((l.nums[i] / l.max) * 100))}%` } }) : null,
           h('b', null, show(l.def.label, v)))))));
   });

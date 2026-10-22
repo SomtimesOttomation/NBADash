@@ -278,8 +278,6 @@ table.cmp tr.grp.sub td { background: none; border-bottom: 1px solid var(--line)
 .cmp-val { position: relative; display: block; padding: 2px 8px; }
 .cmp-val b { position: relative; font-weight: 600; }
 .cmp-bar { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; background: color-mix(in srgb, var(--accent2) 16%, transparent); }
-td.best .cmp-bar { background: color-mix(in srgb, var(--good) 32%, transparent); }
-td.best .cmp-val b { color: var(--good); }
 .cmpbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -4px 16px rgba(0,0,0,.18); }
 .cmpbar-in { display: flex; align-items: center; gap: 12px; padding: 10px 20px; max-width: 1400px; margin: 0 auto; }
 .cmpbar-chips { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
@@ -291,10 +289,9 @@ body.has-cmpbar #app { padding-bottom: 70px; }
 .banner { z-index: 1; }
 .cmp-head b, .cmp-head .cmp-who b { text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--text); }
 
-/* compare: the overall leader's winning stats get a solid green cell; other winners keep a lighter green */
-td.best.lead { background: color-mix(in srgb, var(--good) 22%, transparent); box-shadow: inset 3px 0 0 var(--good); }
-td.best.lead .cmp-bar { background: color-mix(in srgb, var(--good) 45%, transparent); }
-td.best.lead .cmp-val b { color: var(--good); font-weight: 800; }
-th.cmp-head.leader { background: color-mix(in srgb, var(--good) 14%, var(--surface)); box-shadow: inset 0 3px 0 var(--good); }
-.lead-badge { position: absolute; top: 8px; left: 10px; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #fff; background: var(--good); padding: 2px 8px; border-radius: 999px; }
+/* compare: only the winning bar is highlighted (bright green); the header and cells stay plain */
+td.best .cmp-bar { background: #9ce970; }
+td.best .cmp-val b { font-weight: 800; }
+td.best .cmp-val.on-bar b { color: #12240b; }
+.lead-badge { position: absolute; top: 8px; left: 10px; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line); padding: 1px 7px; border-radius: 999px; }
 .cmp-head .wins { color: var(--muted); font-size: 11px; }
