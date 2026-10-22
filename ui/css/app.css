@@ -296,3 +296,12 @@ td.best .cmp-val.on-bar b { color: #12240b; }
 .lead-badge { position: absolute; top: 8px; left: 10px; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line); padding: 1px 7px; border-radius: 999px; }
 .cmp-head .wins { color: var(--muted); font-size: 11px; }
 a.plink:hover { color: var(--accent2); }
+
+/* season week links under the team banner */
+.weekbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 6px 40px; background: var(--surface); border-bottom: 1px solid var(--line); font-size: 13px; }
+.weekbar[hidden] { display: none; }
+.weekbar-label { color: var(--muted); text-transform: uppercase; letter-spacing: .06em; font-size: 11px; margin-right: 4px; }
+.weeklink { padding: 3px 10px; border-radius: 999px; color: var(--text); }
+.weeklink:hover { background: var(--surface2); }
+.weeklink.active { background: var(--surface2); font-weight: 700; box-shadow: inset 0 0 0 1px var(--line); }
+.weeklink + .weeklink::before { content: none; }

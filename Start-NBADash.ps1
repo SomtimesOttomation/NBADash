@@ -79,6 +79,9 @@ function Start-Sync {
         'favorites' { $argsList += '-Quick'; $argsList += '-Force' }
         'force'     { $argsList += '-Force' }
         'team'      { $argsList += '-Quick'; $argsList += '-Force'; $argsList += '-Favorites'; $argsList += $Team }
+        # whole season so far, one scoreboard per day; finished days are skipped, so a cancelled run resumes where it stopped
+        'history'      { $argsList += '-FullSeason'; $argsList += '-HistoryOnly'; $argsList += '-NoBoxes'; $argsList += '-DelayMs'; $argsList += '800' }
+        'historyBoxes' { $argsList += '-FullSeason'; $argsList += '-HistoryOnly'; $argsList += '-DelayMs'; $argsList += '1000' }
     }
     $script:SyncProc = Start-Process -FilePath 'powershell.exe' -ArgumentList $argsList -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput $script:SyncOut
@@ -261,7 +264,7 @@ function Invoke-Command2 {
         }
         'live.refresh' { $script:Shared.RefreshNow = $true; Reply $Msg.id 'true' }
         'sync.run' {
-            $mode = if ($a.mode -in 'favorites', 'all', 'force', 'team') { $a.mode } else { 'favorites' }
+            $mode = if ($a.mode -in 'favorites', 'all', 'force', 'team', 'history', 'historyBoxes') { $a.mode } else { 'favorites' }
             $team = [string]$a.team
             if ($mode -eq 'team' -and $team -notmatch '^[A-Za-z]{2,4}$') { ReplyError $Msg.id 'bad team'; return }
             Reply $Msg.id ((Start-Sync $mode $team).ToString().ToLower())

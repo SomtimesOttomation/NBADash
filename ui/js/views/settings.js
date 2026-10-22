@@ -43,7 +43,9 @@ function syncPanel() {
   const box = h('div', { class: 'syncpanel' });
   const modes = [['favorites', 'Update favorites now', 'Roster, schedule, standings and injuries for your favorite teams, plus recent box scores'],
                  ['all', 'Update everything', 'Everything that is out of date: stale teams, new finished games and their box scores'],
-                 ['force', 'Force full refresh', 'Re-download all 30 teams regardless of age (takes several minutes)']];
+                 ['force', 'Force full refresh', 'Re-download all 30 teams regardless of age (takes several minutes)'],
+                 ['history', 'Fill in season history', 'One scoreboard per day since opening night, for the Week pages (a few seconds per week; runs on its own the first time)'],
+                 ['historyBoxes', 'Download full season history', 'Also downloads every missing box score for the season so far (about 8 KB per game; can be cancelled and resumed)']];
   const paint = () => {
     if (!box.isConnected && box.dataset.mounted) { unsub(); return; }
     box.dataset.mounted = '1';

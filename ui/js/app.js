@@ -1,7 +1,7 @@
 import * as S from './store.js';
 import * as bridge from './bridge.js';
 import { h, ago } from './util.js';
-import { renderBanner } from './components.js';
+import { renderBanner, renderWeekBar } from './components.js';
 import * as home from './views/home.js';
 import * as teamV from './views/team.js';
 import * as gameV from './views/game.js';
@@ -11,6 +11,7 @@ import { openSettings } from './views/settings.js';
 import { openTraffic } from './views/traffic.js';
 import { openUpdate } from './views/update.js';
 import * as playerV from './views/player.js';
+import * as weekV from './views/week.js';
 import * as compareV from './views/compare.js';
 import { initPlayerSearch } from './views/psearch.js';
 import { renderCompareBar } from './views/cmpbar.js';
@@ -28,7 +29,7 @@ export function toast(msg) {
 function route() {
   const hash = location.hash.replace(/^#\/?/, '');
   const [name, arg] = hash.split('/');
-  const map = { '': home, team: teamV, game: gameV, standings, leaders: leadersV, player: playerV, compare: compareV };
+  const map = { '': home, team: teamV, game: gameV, standings, leaders: leadersV, player: playerV, compare: compareV, week: weekV };
   const mod = map[name] || home;
   const routeName = map[name] ? (name || 'home') : 'home';
   document.querySelectorAll('#nav a').forEach((a) => a.classList.toggle('active', a.dataset.route === routeName));
@@ -37,6 +38,7 @@ function route() {
   const ctx = { el: view, arg: arg ? decodeURIComponent(arg) : '' };
   current = { mod, ctx, cleanup: mod.mount(ctx) };
   renderBanner($('#banner'), routeName === 'team' ? ctx.arg : '');
+  renderWeekBar($('#weekbar'), routeName === 'week' ? +ctx.arg : 0);
   window.scrollTo(0, 0);
 }
 
@@ -116,6 +118,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'F5') { e.preventDef
 S.subscribe((topics) => {
   if (topics.has('theme') || topics.has('settings')) themeIcon();
   if (topics.has('teams') || topics.has('favorites')) renderBanner($('#banner'), location.hash.startsWith('#/team/') ? decodeURIComponent(location.hash.slice(7)) : '');
+  if (topics.has('days')) renderWeekBar($('#weekbar'), location.hash.startsWith('#/week/') ? +location.hash.slice(7) : 0);
   if (topics.has('live') || topics.has('days')) liveStatus();
   if (topics.has('sync')) syncBar();
   if (topics.has('update')) { versionChip(); updateToast(); }
