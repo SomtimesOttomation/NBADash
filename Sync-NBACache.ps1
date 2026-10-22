@@ -1,0 +1,446 @@
+<#
+.SYNOPSIS
+  Nightly cache sync for the NBA dashboard (PowerShell 5.1).
+
+.DESCRIPTION
+  Pulls the "static-ish" data and everything that finished since the last run, then
+  writes compact JSON into the cache folder so the dashboard opens instantly from disk.
+  Order: favorites first, one request every -DelayMs so nothing bursts.
+
+    teams.json, logos\            team list, colors, logos
+    teams\<ABBR>.json             roster, head coach, record, compact schedule
+    standings.json, injuries.json
+    scoreboards\yyyyMMdd.json     every finished day since the last run
+    boxscores\<eventId>.json      compact box score per finished game
+    sync-state.json               what was covered (drives catch-up)
+    traffic-log.csv               one line per request (wire bytes vs decoded bytes)
+    logs\sync-yyyyMMdd.log
+
+  Safe to run any time and as often as you like: fresh files are skipped, finished
+  days and box scores are never fetched twice. Games still in progress are skipped
+  and their day is not marked complete until a later run.
+
+.EXAMPLE
+  .\Sync-NBACache.ps1 -Quick -KeepRaw     # first test: favorites only, 3 box scores, raw samples kept
+  .\Sync-NBACache.ps1                      # normal nightly run
+  .\Sync-NBACache.ps1 -Force               # refetch everything inside the backfill window
+#>
+[CmdletBinding()]
+param(
+    [string]$CacheDir     = (Join-Path $env:LOCALAPPDATA 'NBADash\cache'),
+    [string]$SettingsPath = (Join-Path $env:APPDATA 'NBADash\settings.json'),
+    [string[]]$Favorites,
+    [int]$MaxBackfillDays = 7,
+    [int]$DelayMs         = 1500,
+    [int]$Season          = 2027,    # ESPN names 2026-27 by its ending year
+    [switch]$Force,
+    [switch]$Quick,                  # favorites only, 2-day window, at most 3 box scores
+    [switch]$KeepRaw                 # also keep the raw ESPN JSON under cache\raw (for checking field names)
+)
+
+$ErrorActionPreference = 'Continue'
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+# ---------------------------------------------------------------- one run at a time
+$mutex = New-Object System.Threading.Mutex($false, 'Local\NBADashSync')
+$gotLock = $false
+try { $gotLock = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $gotLock = $true }   # a previous run was killed
+if (-not $gotLock) {
+    Write-Host 'Another sync is already running (the dashboard, the nightly task, or another PowerShell window); exiting.'
+    $mutex.Dispose(); exit 0
+}
+
+# ---------------------------------------------------------------- setup
+foreach ($sub in '', 'logos', 'teams', 'scoreboards', 'boxscores', 'logs', 'raw') {
+    $p = Join-Path $CacheDir $sub
+    if (-not (Test-Path $p)) { New-Item -ItemType Directory -Path $p -Force | Out-Null }
+}
+$UA     = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) NBADash-Sync/0.1'
+$espn   = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba'
+$utf8   = New-Object System.Text.UTF8Encoding($false)
+$runId  = (Get-Date).ToString('yyyyMMdd-HHmmss')
+$logFile = Join-Path $CacheDir ("logs\sync-" + (Get-Date).ToString('yyyyMMdd') + '.log')
+$script:Traffic = New-Object System.Collections.ArrayList
+$script:Errors  = 0
+if ($Quick) { $MaxBackfillDays = 2 }
+
+function Write-Log {
+    param([string]$Text)
+    $line = '{0}  {1}' -f (Get-Date).ToString('HH:mm:ss'), $Text
+    Write-Host $line
+    Add-Content -Path $logFile -Value $line -Encoding UTF8
+}
+
+# Progress marker for the dashboard (console only, not written to the log file): ##PROGRESS pct|text
+function Set-Progress {
+    param([double]$Pct, [string]$Text)
+    Write-Host ('##PROGRESS {0}|{1}' -f [int][Math]::Min(100, [Math]::Max(0, $Pct)), $Text)
+}
+
+function Save-Json {
+    param([string]$Path, $Object)
+    $json = $Object | ConvertTo-Json -Depth 10 -Compress
+    [IO.File]::WriteAllText($Path, $json, $utf8)
+}
+
+function Test-Fresh {
+    param([string]$Path, [double]$Hours = 20)
+    if ($Force) { return $false }
+    if (-not (Test-Path $Path)) { return $false }
+    return (((Get-Date) - (Get-Item $Path).LastWriteTime).TotalHours -lt $Hours)
+}
+
+function Get-Json {
+    param([string]$Url, [string]$Kind, [string]$RawName = '')
+    $obj = $null
+    for ($try = 1; $try -le 3; $try++) {
+        $sw = [Diagnostics.Stopwatch]::StartNew()
+        $status = 0; $wire = -1; $dec = 0; $err = ''
+        try {
+            $req = [Net.HttpWebRequest]::Create($Url)
+            $req.UserAgent = $UA
+            $req.Accept = 'application/json'
+            $req.Timeout = 30000
+            $req.AutomaticDecompression = [Net.DecompressionMethods]::GZip -bor [Net.DecompressionMethods]::Deflate
+            $resp = $req.GetResponse()
+            $status = [int]$resp.StatusCode
+            $wire = $resp.ContentLength               # compressed size when known, -1 if chunked
+            $sr = New-Object System.IO.StreamReader($resp.GetResponseStream(), [Text.Encoding]::UTF8)
+            $text = $sr.ReadToEnd()
+            $sr.Close(); $resp.Close()
+            $dec = [Text.Encoding]::UTF8.GetByteCount($text)
+            if ($KeepRaw -and $RawName) {
+                [IO.File]::WriteAllText((Join-Path $CacheDir ("raw\" + $RawName + '.json')), $text, $utf8)
+            }
+            $obj = $text | ConvertFrom-Json
+        }
+        catch [System.Net.WebException] {
+            $err = $_.Exception.Message
+            if ($_.Exception.Response) { $status = [int]$_.Exception.Response.StatusCode }
+        }
+        catch { $err = $_.Exception.Message }
+        $sw.Stop()
+        [void]$script:Traffic.Add([pscustomobject]@{
+            Run = $runId; Time = (Get-Date).ToString('s'); Kind = $Kind; Status = $status
+            Ms = [int]$sw.ElapsedMilliseconds; WireBytes = $wire; DecodedBytes = $dec; Url = $Url
+        })
+        Start-Sleep -Milliseconds $DelayMs
+        if ($obj) { return $obj }
+        if ($status -eq 429 -or $status -ge 500 -or $status -eq 0) {
+            Write-Log ("  retry {0}/3 after error {1} {2}" -f $try, $status, $err)
+            Start-Sleep -Seconds (5 * $try)
+        } else { break }
+    }
+    $script:Errors++
+    Write-Log "  FAILED: $Kind $Url"
+    return $null
+}
+
+function Get-File {
+    param([string]$Url, [string]$Path, [string]$Kind)
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $status = 0; $bytes = 0
+    try {
+        $req = [Net.HttpWebRequest]::Create($Url)
+        $req.UserAgent = $UA; $req.Timeout = 30000
+        $resp = $req.GetResponse()
+        $status = [int]$resp.StatusCode
+        $ms = New-Object System.IO.MemoryStream
+        $resp.GetResponseStream().CopyTo($ms)
+        $resp.Close()
+        [IO.File]::WriteAllBytes($Path, $ms.ToArray())
+        $bytes = $ms.Length
+    }
+    catch { $script:Errors++; Write-Log "  FAILED file: $Url  $($_.Exception.Message)" }
+    $sw.Stop()
+    [void]$script:Traffic.Add([pscustomobject]@{
+        Run = $runId; Time = (Get-Date).ToString('s'); Kind = $Kind; Status = $status
+        Ms = [int]$sw.ElapsedMilliseconds; WireBytes = $bytes; DecodedBytes = $bytes; Url = $Url
+    })
+    Start-Sleep -Milliseconds $DelayMs
+}
+
+function Get-ScoreText {
+    param($Competitor)
+    $sc = $Competitor.score
+    if ($null -eq $sc) { return $null }
+    if ($sc.PSObject.Properties['displayValue']) { return [string]$sc.displayValue }
+    return [string]$sc
+}
+
+function ConvertTo-EspnAbbr {
+    param([string]$Code)
+    $map = @{ 'NYK' = 'NY'; 'GSW' = 'GS'; 'SAS' = 'SA'; 'NOP' = 'NO'; 'UTA' = 'UTAH'; 'WAS' = 'WSH' }
+    $c = $Code.ToUpper()
+    if ($map.ContainsKey($c)) { return $map[$c] }
+    return $c
+}
+
+# ---------------------------------------------------------------- favorites + dates
+if (-not $Favorites -and (Test-Path $SettingsPath)) {
+    try { $Favorites = @((Get-Content $SettingsPath -Raw | ConvertFrom-Json).favorites) } catch { }
+}
+if (-not $Favorites) { $Favorites = @('TOR') }
+$favAbbr = @($Favorites | ForEach-Object { ConvertTo-EspnAbbr $_ })
+
+$et    = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, 'Eastern Standard Time')
+$yday  = $et.Date.AddDays(-1)
+$statePath = Join-Path $CacheDir 'sync-state.json'
+$state = $null
+if (Test-Path $statePath) { try { $state = Get-Content $statePath -Raw | ConvertFrom-Json } catch { } }
+
+$seasonStart = [datetime]'2026-10-20'
+$windowStart = $yday.AddDays(-($MaxBackfillDays - 1))
+if ($state -and $state.lastCompleteDate) {
+    $start = [datetime]::ParseExact([string]$state.lastCompleteDate, 'yyyyMMdd', $null).AddDays(1)
+    if ($start -lt $windowStart) { $start = $windowStart }
+} else { $start = $windowStart }
+if ($start -lt $seasonStart) { $start = $seasonStart }
+if ($Force) { $start = $windowStart; if ($start -lt $seasonStart) { $start = $seasonStart } }
+
+Write-Log ("=== Sync {0}  favorites: {1}  days: {2:yyyy-MM-dd} to {3:yyyy-MM-dd}  quick={4} force={5}" -f $runId, ($favAbbr -join ','), $start, $yday, [bool]$Quick, [bool]$Force)
+
+# ---------------------------------------------------------------- 1. teams + logos
+Set-Progress 2 'Contacting ESPN'
+$t = Get-Json "$espn/teams" 'teams' 'teams'
+if (-not $t) { Write-Log 'Cannot reach ESPN; stopping.'; $mutex.ReleaseMutex(); $mutex.Dispose(); exit 1 }
+$teams = @($t.sports[0].leagues[0].teams | ForEach-Object { $_.team })
+$teamList = @($teams | Sort-Object displayName | ForEach-Object {
+    [pscustomobject]@{
+        id = $_.id; abbr = $_.abbreviation; name = $_.displayName; location = $_.location
+        nickname = $_.name; color = $_.color; altColor = $_.alternateColor; logo = $_.logos[0].href
+    }
+})
+Save-Json (Join-Path $CacheDir 'teams.json') $teamList
+Write-Log ("Teams: {0}" -f $teamList.Count)
+Set-Progress 5 'Checking team logos'
+
+foreach ($tm in $teamList) {
+    $logoPath = Join-Path $CacheDir ("logos\" + $tm.abbr + '.png')
+    if ((-not (Test-Path $logoPath)) -and $tm.logo) { Get-File $tm.logo $logoPath 'logo' }
+}
+
+# ---------------------------------------------------------------- 2. teams: roster, coach, schedule
+$ordered = @($teamList | Sort-Object @{ Expression = { if ($favAbbr -contains $_.abbr) { 0 } else { 1 } } }, name)
+if ($Quick) { $ordered = @($ordered | Where-Object { $favAbbr -contains $_.abbr }) }
+
+$ti = 0
+foreach ($tm in $ordered) {
+    $ti++
+    Set-Progress (8 + 62 * ($ti - 1) / [Math]::Max(1, $ordered.Count)) ("Team {0} ({1} of {2})" -f $tm.abbr, $ti, $ordered.Count)
+    $teamPath = Join-Path $CacheDir ("teams\" + $tm.abbr + '.json')
+    if (Test-Fresh $teamPath 20) { Write-Log "Team $($tm.abbr): fresh, skipped"; continue }
+    Write-Log "Team $($tm.abbr)"
+    $d = Get-Json "$espn/teams/$($tm.id)" 'team' ("team-" + $tm.abbr)
+    $r = Get-Json "$espn/teams/$($tm.id)/roster" 'roster' ("roster-" + $tm.abbr)
+    $s = Get-Json "$espn/teams/$($tm.id)/schedule?season=$Season&seasontype=2" 'schedule' ("schedule-" + $tm.abbr)
+    if (-not $r) { continue }
+
+    $players = @($r.athletes | ForEach-Object {
+        [pscustomobject]@{
+            id = $_.id; name = $_.fullName; jersey = $_.jersey; pos = $_.position.abbreviation
+            height = $_.displayHeight; weight = $_.displayWeight; age = $_.age
+            years = $_.experience.years; headshot = $_.headshot.href
+        }
+    })
+    $coach = @($r.coach) | Select-Object -First 1
+    $games = @()
+    if ($s) {
+        $games = @($s.events | ForEach-Object {
+            $comp = $_.competitions[0]
+            $hc = $comp.competitors | Where-Object { $_.homeAway -eq 'home' } | Select-Object -First 1
+            $ac = $comp.competitors | Where-Object { $_.homeAway -eq 'away' } | Select-Object -First 1
+            # The schedule feed can leave a competitor's abbreviation or score empty; shortName ("CHI @ TOR") is reliable.
+            $hAbbr = $hc.team.abbreviation; $aAbbr = $ac.team.abbreviation
+            if ($_.shortName -match '^\s*(\S+)\s*@\s*(\S+)\s*$') {
+                if (-not $aAbbr) { $aAbbr = $Matches[1] }
+                if (-not $hAbbr) { $hAbbr = $Matches[2] }
+            }
+            [pscustomobject]@{
+                id = $_.id; date = $_.date; name = $_.shortName; state = $comp.status.type.state; status = $comp.status.type.description
+                home = $hAbbr; away = $aAbbr
+                homeScore = (Get-ScoreText $hc); awayScore = (Get-ScoreText $ac)
+                venue = $comp.venue.fullName
+            }
+        })
+    }
+    Save-Json $teamPath ([pscustomobject]@{
+        abbr = $tm.abbr; id = $tm.id; name = $tm.name
+        record = $d.team.record.items[0].summary
+        espnArena = $d.team.franchise.venue.fullName
+        headCoach = (("{0} {1}" -f $coach.firstName, $coach.lastName).Trim())
+        players = $players; games = $games
+        syncedAt = (Get-Date).ToString('s')
+    })
+    Write-Log ("  {0} players, {1} games" -f $players.Count, $games.Count)
+}
+
+# ---------------------------------------------------------------- 3. standings
+$stPath = Join-Path $CacheDir 'standings.json'
+if (-not (Test-Fresh $stPath 4)) {
+    Write-Log 'Standings'
+    Set-Progress 72 'Standings'
+    $st = Get-Json 'https://site.api.espn.com/apis/v2/sports/basketball/nba/standings' 'standings' 'standings'
+    if ($st) {
+        $conf = @($st.children | ForEach-Object {
+            $cname = $_.name
+            [pscustomobject]@{
+                name = $cname
+                teams = @($_.standings.entries | ForEach-Object {
+                    $h = @{}
+                    foreach ($x in $_.stats) { $h[$x.name] = $x.displayValue }
+                    [pscustomobject]@{ abbr = $_.team.abbreviation; name = $_.team.displayName; stats = $h }
+                })
+            }
+        })
+        Save-Json $stPath ([pscustomobject]@{ syncedAt = (Get-Date).ToString('s'); conferences = $conf })
+    }
+}
+
+# ---------------------------------------------------------------- 4. injuries
+$injPath = Join-Path $CacheDir 'injuries.json'
+if (-not (Test-Fresh $injPath 4)) {
+    Write-Log 'Injuries'
+    Set-Progress 76 'Injuries'
+    $inj = Get-Json "$espn/injuries" 'injuries' 'injuries'
+    if ($inj) {
+        $teamsInj = @($inj.injuries | ForEach-Object {
+            [pscustomobject]@{
+                team = $_.displayName; teamId = $_.id
+                players = @($_.injuries | ForEach-Object {
+                    [pscustomobject]@{
+                        id = $_.athlete.id; name = $_.athlete.displayName; status = $_.status
+                        date = $_.date; comment = $_.shortComment
+                    }
+                })
+            }
+        })
+        Save-Json $injPath ([pscustomobject]@{ syncedAt = (Get-Date).ToString('s'); teams = $teamsInj })
+    }
+}
+
+# ---------------------------------------------------------------- 5. finished days: scoreboards + box scores
+$lastComplete = $null
+if ($state -and $state.lastCompleteDate) { $lastComplete = [string]$state.lastCompleteDate }
+$blocked = $false
+$boxCount = 0
+$boxMax = 0
+if ($Quick) { $boxMax = 3 }
+
+$totalDays = [Math]::Max(1, [int](($yday - $start).TotalDays) + 1)
+for ($day = $start; $day -le $yday; $day = $day.AddDays(1)) {
+    $ds = $day.ToString('yyyyMMdd')
+    $dayPct = 78 + 20 * ([int](($day - $start).TotalDays)) / $totalDays
+    Set-Progress $dayPct ('Games for ' + $day.ToString('MMM d'))
+    $sbPath = Join-Path $CacheDir ("scoreboards\" + $ds + '.json')
+    $cached = $null
+    if ((-not $Force) -and (Test-Path $sbPath)) { try { $cached = Get-Content $sbPath -Raw | ConvertFrom-Json } catch { } }
+
+    if ($cached -and $cached.allFinal) {
+        Write-Log "Day ${ds}: already complete"
+        if (-not $blocked) { $lastComplete = $ds }
+        continue
+    }
+
+    Write-Log "Day $ds"
+    $sb = Get-Json "$espn/scoreboard?dates=$ds" 'scoreboard' ("scoreboard-" + $ds)
+    if (-not $sb) { $blocked = $true; continue }
+    $events = @($sb.events)
+    $anyLive = $false
+    $evOut = @()
+    foreach ($ev in $events) {
+        $comp  = $ev.competitions[0]
+        $state2 = $ev.status.type.state
+        if ($state2 -eq 'in') { $anyLive = $true }
+        $sides = @($comp.competitors | ForEach-Object {
+            [pscustomobject]@{
+                side = $_.homeAway; abbr = $_.team.abbreviation; name = $_.team.displayName
+                score = (Get-ScoreText $_); winner = $_.winner
+                record = ($_.records | Select-Object -First 1).summary
+                lines = @($_.linescores | ForEach-Object { $_.displayValue })
+                leaders = @($_.leaders | ForEach-Object {
+                    $l = $_.leaders | Select-Object -First 1
+                    [pscustomobject]@{ cat = $_.name; player = $l.athlete.displayName; value = $l.displayValue }
+                })
+            }
+        })
+        $evOut += [pscustomobject]@{
+            id = $ev.id; date = $ev.date; name = $ev.shortName; state = $state2
+            detail = $ev.status.type.shortDetail; period = $ev.status.period
+            venue = $comp.venue.fullName; sides = $sides
+        }
+    }
+    # a past day with no games (for example Election Day) counts as complete
+    $allFinal = (@($events | Where-Object { $_.status.type.state -ne 'post' }).Count -eq 0)
+    Save-Json $sbPath ([pscustomobject]@{ date = $ds; allFinal = $allFinal; syncedAt = (Get-Date).ToString('s'); events = $evOut })
+
+    # box scores for finished games
+    foreach ($ev in ($events | Where-Object { $_.status.type.state -eq 'post' })) {
+        if ($boxMax -gt 0 -and $boxCount -ge $boxMax) { break }
+        $bxPath = Join-Path $CacheDir ("boxscores\" + $ev.id + '.json')
+        if ((-not $Force) -and (Test-Path $bxPath)) { continue }
+        Set-Progress ($dayPct + 10 / $totalDays) ('Box score ' + $ev.shortName)
+        $sum = Get-Json "https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/summary?region=us&lang=en&contentorigin=espn&event=$($ev.id)" 'boxscore' ("summary-" + $ev.id)
+        if (-not $sum -or -not $sum.boxscore) {
+            $sum = Get-Json "$espn/summary?event=$($ev.id)" 'boxscore' ("summary-alt-" + $ev.id)
+        }
+        if (-not $sum -or -not $sum.boxscore) { continue }
+        $boxTeams = @($sum.boxscore.players | ForEach-Object {
+            $grp = $_.statistics | Select-Object -First 1
+            [pscustomobject]@{
+                team = $_.team.abbreviation
+                labels = @($grp.labels)
+                players = @($grp.athletes | ForEach-Object {
+                    [pscustomobject]@{
+                        id = $_.athlete.id; name = $_.athlete.displayName; jersey = $_.athlete.jersey
+                        pos = $_.athlete.position.abbreviation; starter = $_.starter
+                        dnp = $_.didNotPlay; reason = $_.reason; stats = @($_.stats)
+                    }
+                })
+                totals = @($grp.totals)
+            }
+        })
+        $teamStats = @($sum.boxscore.teams | ForEach-Object {
+            [pscustomobject]@{
+                team = $_.team.abbreviation
+                stats = @($_.statistics | ForEach-Object { [pscustomobject]@{ name = $_.name; value = $_.displayValue } })
+            }
+        })
+        Save-Json $bxPath ([pscustomobject]@{
+            id = $ev.id; date = $ev.date; name = $ev.shortName
+            venue = $sum.gameInfo.venue.fullName; city = $sum.gameInfo.venue.address.city
+            attendance = $sum.gameInfo.attendance
+            teams = $boxTeams; teamStats = $teamStats
+            syncedAt = (Get-Date).ToString('s')
+        })
+        $boxCount++
+        Write-Log ("  box score {0}: {1}" -f $ev.id, $ev.shortName)
+    }
+
+    if ($anyLive -or -not $allFinal) { $blocked = $true; Write-Log "  Day $ds not complete yet (games still live or not final)" }
+    elseif (-not $blocked) { $lastComplete = $ds }
+}
+
+# ---------------------------------------------------------------- state + traffic log
+$wireTotal = 0; $decTotal = 0
+foreach ($row in $script:Traffic) {
+    if ($row.WireBytes -gt 0) { $wireTotal += $row.WireBytes }
+    $decTotal += $row.DecodedBytes
+}
+Save-Json $statePath ([pscustomobject]@{
+    lastRun = (Get-Date).ToString('s'); lastCompleteDate = $lastComplete
+    requests = $script:Traffic.Count; wireBytes = $wireTotal; decodedBytes = $decTotal
+    errors = $script:Errors; boxScoresSaved = $boxCount
+})
+$csv = Join-Path $CacheDir 'traffic-log.csv'
+if (Test-Path $csv) {
+    $script:Traffic | ConvertTo-Csv -NoTypeInformation | Select-Object -Skip 1 | Add-Content -Path $csv -Encoding UTF8
+} else {
+    $script:Traffic | Export-Csv -Path $csv -NoTypeInformation -Encoding UTF8
+}
+
+Set-Progress 100 'Finished'
+Write-Log ("=== Done: {0} requests, {1:N0} KB on the wire (where reported), {2:N0} KB decoded, {3} box scores, {4} errors, covered through {5}" -f `
+    $script:Traffic.Count, ($wireTotal / 1KB), ($decTotal / 1KB), $boxCount, $script:Errors, $lastComplete)
+$mutex.ReleaseMutex(); $mutex.Dispose()
+if ($script:Errors -gt 0) { exit 1 } else { exit 0 }
