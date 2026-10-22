@@ -9,6 +9,7 @@ import * as standings from './views/standings.js';
 import * as leadersV from './views/leaders.js';
 import { openSettings } from './views/settings.js';
 import { openTraffic } from './views/traffic.js';
+import { openUpdate } from './views/update.js';
 
 const $ = (s) => document.querySelector(s);
 const view = $('#view');
@@ -39,6 +40,13 @@ function themeIcon() {
   const t = S.state.settings.theme;
   $('#btn-theme').textContent = t === 'dark' ? '☾' : t === 'light' ? '☀' : '◐';
   $('#btn-theme').title = `Theme: ${t} (click to change)`;
+}
+
+// ---- updates: one quiet nudge when the startup check finds something; the version chip carries the rest
+let nudged = '';
+function updateToast() {
+  const u = S.state.update;
+  if (u.phase === 'available' && u.quiet && nudged !== u.info?.latest) { nudged = u.info.latest; toast(`Version ${u.info.latest} is available. Click the version number to update.`); }
 }
 
 // ---- sync progress strip --------------------------------------------------------------------
@@ -85,6 +93,15 @@ $('#btn-theme').addEventListener('click', () => {
   S.saveSettings({ theme: next });
 });
 $('#btn-settings').addEventListener('click', openSettings);
+$('#btn-version').addEventListener('click', openUpdate);
+
+function versionChip() {
+  const b = $('#btn-version'), u = S.state.update;
+  b.textContent = S.state.version ? `v${S.state.version}` : '';
+  b.hidden = !S.state.version;
+  b.classList.toggle('has-update', S.updateReady());
+  b.title = u.phase === 'available' ? `Version ${u.info?.latest} is available` : u.phase === 'staged' ? 'Update downloaded: click to install' : 'Check for updates';
+}
 $('#btn-refresh').addEventListener('click', async () => {
   const b = $('#btn-refresh'); b.classList.add('spin');
   try { await bridge.request('live.refresh'); } catch (e) { toast(e.message); }
@@ -97,11 +114,16 @@ S.subscribe((topics) => {
   if (topics.has('teams') || topics.has('favorites')) renderBanner($('#banner'), location.hash.startsWith('#/team/') ? decodeURIComponent(location.hash.slice(7)) : '');
   if (topics.has('live') || topics.has('days')) liveStatus();
   if (topics.has('sync')) syncBar();
+  if (topics.has('update')) { versionChip(); updateToast(); }
   current?.mod.update?.(topics, current.ctx);
 });
 setInterval(liveStatus, 15000);
 
 window.addEventListener('hashchange', route);
-S.init().then(() => { themeIcon(); liveStatus(); route(); }).catch((e) => {
+S.init().then(() => {
+  themeIcon(); liveStatus(); route(); versionChip();
+  const n = S.state.update.note;
+  if (n) toast(n.ok ? `Updated to v${n.to}.` : `The update to v${n.to} did not work (${n.reason || 'unknown reason'}). v${n.from} was restored.`);
+}).catch((e) => {
   view.replaceChildren(h('div', { class: 'empty' }, h('h3', null, 'Could not start'), h('p', null, e.message)));
 });

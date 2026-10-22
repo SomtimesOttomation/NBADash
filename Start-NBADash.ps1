@@ -12,8 +12,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '0.1.0'
 $Root = $PSScriptRoot
+$Version = '0.0.0'
+try { $Version = ([IO.File]::ReadAllText((Join-Path $Root 'VERSION'))).Trim() } catch { }
 
 # WinForms + WebView2 need a single-threaded apartment. Windows PowerShell 5.1 consoles are STA already.
 if ([Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA') {
@@ -46,11 +47,11 @@ $settingsDir = Split-Path $SettingsPath
 if (-not (Test-Path $settingsDir)) { New-Item -ItemType Directory -Path $settingsDir -Force | Out-Null }
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
-$script:Settings = [pscustomobject]@{ favorites = @(); theme = 'system'; liveSeconds = 30; autoWatch = $true }
+$script:Settings = [pscustomobject]@{ favorites = @(); theme = 'system'; liveSeconds = 30; autoWatch = $true; updateCheck = $true }
 if (Test-Path $SettingsPath) {
     try {
         $loaded = Get-Content $SettingsPath -Raw | ConvertFrom-Json
-        foreach ($k in 'favorites', 'theme', 'liveSeconds', 'autoWatch') { if ($null -ne $loaded.$k) { $script:Settings.$k = $loaded.$k } }
+        foreach ($k in 'favorites', 'theme', 'liveSeconds', 'autoWatch', 'updateCheck') { if ($null -ne $loaded.$k) { $script:Settings.$k = $loaded.$k } }
     } catch { }
 }
 
@@ -113,6 +114,45 @@ function Get-SyncProgress {
     return $r
 }
 
+# ---------------------------------------------------------------- updater (child process, like the sync)
+$script:UpdDir = Join-Path $env:LOCALAPPDATA 'NBADash\update'
+if (-not (Test-Path $script:UpdDir)) { New-Item -ItemType Directory -Path $script:UpdDir -Force | Out-Null }
+$script:UpdProc = $null
+$script:UpdAction = ''
+$script:UpdOut = Join-Path $script:UpdDir 'update.out'
+$script:UpdResult = Join-Path $script:UpdDir 'update-result.json'
+$script:LastUpdJson = ''
+function Start-Updater {
+    param([string]$Action)
+    if ($script:UpdProc -and -not $script:UpdProc.HasExited) { return $false }
+    $cur = if ($env:NBADASH_FAKE_VERSION) { $env:NBADASH_FAKE_VERSION } else { $Version }    # test hook: pretend to be older
+    Remove-Item $script:UpdResult -Force -ErrorAction SilentlyContinue
+    $argsList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f (Join-Path $Root 'Update-NBADash.ps1')),
+                  '-Action', $Action, '-CurrentVersion', $cur, '-WorkDir', ('"{0}"' -f $script:UpdDir))
+    if ($env:NBADASH_UPDATE_API) { $argsList += '-ApiBase'; $argsList += $env:NBADASH_UPDATE_API }   # test hook
+    $script:UpdAction = $Action
+    $script:UpdProc = Start-Process -FilePath 'powershell.exe' -ArgumentList $argsList -WindowStyle Hidden -PassThru -RedirectStandardOutput $script:UpdOut
+    $script:LastUpdJson = ''
+    Push-NbaEvent $script:Shared 'update' @{ running = $true; action = $Action; pct = 0; text = 'Starting...' }
+    return $true
+}
+function Read-UpdateJson {
+    param([string]$Name)
+    $p = Join-Path $script:UpdDir $Name
+    if (Test-Path $p) { try { return (Get-Content $p -Raw | ConvertFrom-Json) } catch { } }
+    return $null
+}
+# After an update: the helper left a "pending" note. Report the result once, and tell the helper this start worked.
+$script:UpdateNote = $null
+$pend = Read-UpdateJson 'update-pending.json'
+if ($pend -and [string]$pend.to -eq $Version) { $script:UpdateNote = @{ ok = $true; from = [string]$pend.from; to = [string]$pend.to } }
+$failed = Read-UpdateJson 'update-failed.json'
+if ($failed) {
+    $script:UpdateNote = @{ ok = $false; from = [string]$failed.from; to = [string]$failed.to; reason = [string]$failed.reason }
+    Remove-Item (Join-Path $script:UpdDir 'update-failed.json') -Force -ErrorAction SilentlyContinue
+    Remove-Item (Join-Path $script:UpdDir 'update-pending.json') -Force -ErrorAction SilentlyContinue
+}
+
 # ---------------------------------------------------------------- window
 $form = New-Object Windows.Forms.Form
 $form.Text = 'NBA 2026-27'
@@ -162,10 +202,15 @@ function Invoke-Command2 {
         'init' {
             $st = Get-SyncState
             $obj = @{
-                settings = $script:Settings; cacheDir = $CacheDir; version = $Version; sample = $false
+                settings = $script:Settings; cacheDir = $CacheDir; version = $Version; sample = $false; updateNote = $script:UpdateNote
                 sync = @{ running = [bool]($script:SyncProc -and -not $script:SyncProc.HasExited); lastRun = $(if ($st) { $st.lastRun } else { $null }); lastCompleteDate = $(if ($st) { $st.lastCompleteDate } else { $null }) }
             }
             Reply $Msg.id (ConvertTo-Json -InputObject $obj -Depth 6 -Compress)
+            if ($script:UpdateNote -and $script:UpdateNote.ok) {     # page loaded: confirm the update to the helper
+                try { [IO.File]::WriteAllText((Join-Path $script:UpdDir 'update-ok.json'), '{"ok":true}', $utf8) } catch { }
+                Remove-Item (Join-Path $script:UpdDir 'update-pending.json') -Force -ErrorAction SilentlyContinue
+            }
+            $script:UpdateNote = $null
         }
         'cache.read' {
             $p = Resolve-CachePath $a.path
@@ -189,6 +234,7 @@ function Invoke-Command2 {
             $script:Settings = [pscustomobject]@{
                 favorites = @($s.favorites); theme = [string]$s.theme
                 liveSeconds = [Math]::Max(10, [int]$s.liveSeconds); autoWatch = [bool]$s.autoWatch
+                updateCheck = $(if ($null -eq $s.updateCheck) { $true } else { [bool]$s.updateCheck })
             }
             $script:Shared.LiveSeconds = $script:Settings.liveSeconds
             Save-Settings
@@ -219,6 +265,27 @@ function Invoke-Command2 {
             $team = [string]$a.team
             if ($mode -eq 'team' -and $team -notmatch '^[A-Za-z]{2,4}$') { ReplyError $Msg.id 'bad team'; return }
             Reply $Msg.id ((Start-Sync $mode $team).ToString().ToLower())
+        }
+        'update.check' { Reply $Msg.id ((Start-Updater 'Check').ToString().ToLower()) }
+        'update.stage' { Reply $Msg.id ((Start-Updater 'Stage').ToString().ToLower()) }
+        'update.cancel' {
+            try { if ($script:UpdProc -and -not $script:UpdProc.HasExited) { $script:UpdProc.Kill() } } catch { }
+            Reply $Msg.id 'true'
+        }
+        'update.apply' {
+            $st = Read-UpdateJson 'staged.json'
+            $stage = Join-Path $script:UpdDir 'stage'
+            if (-not $st -or -not (Test-Path (Join-Path $stage 'Start-NBADash.ps1'))) { ReplyError $Msg.id 'There is no downloaded update to install. Download it again.'; return }
+            # run the helper from a copy so replacing the app files cannot touch the running helper
+            $runDir = Join-Path $script:UpdDir 'run'
+            if (-not (Test-Path $runDir)) { New-Item -ItemType Directory -Path $runDir -Force | Out-Null }
+            $helper = Join-Path $runDir 'Apply-Update.ps1'
+            Copy-Item (Join-Path $Root 'Apply-Update.ps1') $helper -Force
+            $h = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f $helper), '-AppDir', ('"{0}"' -f $Root), '-StageDir', ('"{0}"' -f $stage),
+                   '-WorkDir', ('"{0}"' -f $script:UpdDir), '-ParentPid', [string]$PID, '-OldVersion', $Version, '-NewVersion', [string]$st.version)
+            Start-Process -FilePath 'powershell.exe' -ArgumentList $h -WindowStyle Hidden | Out-Null
+            Reply $Msg.id 'true'
+            $form.Close()
         }
         'traffic.get' {
             $t = $script:Shared.Traffic
@@ -290,6 +357,18 @@ $timer.add_Tick({
             if ($json -ne $script:LastSyncJson) { $script:LastSyncJson = $json; Send-Page $json }
         }
     }
+    if ($script:UpdProc) {
+        if ($script:UpdProc.HasExited) {
+            $res = Read-UpdateJson 'update-result.json'
+            if (-not $res) { $res = [pscustomobject]@{ status = 'error'; error = 'The update check ended without an answer.' } }
+            $script:UpdProc = $null
+            Send-Page ((@{ event = 'update'; data = @{ running = $false; action = $script:UpdAction; result = $res } }) | ConvertTo-Json -Depth 6 -Compress)
+        } else {
+            $prog = Get-SyncProgress $script:UpdOut
+            $json = (@{ event = 'update'; data = @{ running = $true; action = $script:UpdAction; pct = $prog.pct; text = $prog.text } }) | ConvertTo-Json -Compress
+            if ($json -ne $script:LastUpdJson) { $script:LastUpdJson = $json; Send-Page $json }
+        }
+    }
   } catch { }
 })
 $timer.Start()
@@ -299,6 +378,7 @@ $form.add_FormClosing({
     $script:Shared.Stop = $true
     # never leave a hidden sync running behind us: it would hold the sync lock
     try { if ($script:SyncProc -and -not $script:SyncProc.HasExited) { $script:SyncProc.Kill() } } catch { }
+    try { if ($script:UpdProc -and -not $script:UpdProc.HasExited) { $script:UpdProc.Kill() } } catch { }
     try { $h = $script:WorkerPs.BeginStop($null, $null); [void]$h.AsyncWaitHandle.WaitOne(2000) } catch { }
 })
 

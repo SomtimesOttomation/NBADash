@@ -3,6 +3,7 @@ import * as bridge from '../bridge.js';
 import { h, ago } from '../util.js';
 import { displayCode } from '../arenas.js';
 import { teamLogo } from '../components.js';
+import { openUpdate } from './update.js';
 
 function overlay(content) {
   const root = document.getElementById('overlay-root');
@@ -26,6 +27,8 @@ export function openSettings() {
         ['system', 'light', 'dark'].map((t) => h('button', { class: `btn ${s.theme === t ? 'primary' : ''}`, type: 'button', style: { marginRight: '6px' }, onclick: () => { S.saveSettings({ theme: t }); close(); } }, t))),
       h('p', null, h('label', null, h('input', { type: 'checkbox', checked: s.autoWatch ? true : null, onchange: (e) => S.saveSettings({ autoWatch: e.target.checked }) }),
         ' Automatically watch live box scores for my favorite teams')),
+      h('p', null, h('label', null, h('input', { type: 'checkbox', checked: s.updateCheck !== false ? true : null, onchange: (e) => S.saveSettings({ updateCheck: e.target.checked }) }),
+        ' Check GitHub for a new version when the app starts '), h('button', { class: 'btn', type: 'button', style: { marginLeft: '8px' }, onclick: () => { close(); openUpdate(); } }, `v${S.state.version || '?'} - Check for updates`)),
       h('p', null, h('b', null, 'Favorites '), favs.size ? [...favs].map((a) => h('span', { style: { marginRight: '6px' } }, teamLogo(a, 26))) : h('small', null, 'none yet – star a team in the banner')),
       h('hr', { style: { border: 0, borderTop: '1px solid var(--line)' } }),
       h('p', null, h('b', null, 'Data cache '), h('small', null, S.state.cacheDir || '(dev preview)')),

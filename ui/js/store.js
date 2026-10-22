@@ -13,7 +13,7 @@ export const state = {
   teams: [],
   byAbbr: new Map(),
   byId: new Map(),
-  settings: { favorites: [], theme: 'system', liveSeconds: 30, autoWatch: true },
+  settings: { favorites: [], theme: 'system', liveSeconds: 30, autoWatch: true, updateCheck: true },
   days: new Map(),          // 'yyyymmdd' -> { key, events, allFinal, source, at }
   cachedDayKeys: [],
   teamFiles: new Map(),     // abbr -> file | null
@@ -27,6 +27,7 @@ export const state = {
   cachedBoxIds: new Set(),
   season: new Map(),        // abbr -> { agg, loaded, total, loading }
   league: { data: null, loading: false, n: 0, total: 0, rev: 0 },
+  update: { phase: 'idle', info: null, pct: 0, text: '', error: '', quiet: false, note: null },
 };
 
 export const todayKey = () => etKey(new Date());
@@ -147,6 +148,43 @@ function onSync(d) {
   if (d.running === false) { state.season.clear(); loadLeague(); refreshCachedBoxes(); refreshCachedDays(); loadStandings(true); loadInjuries(true); state.teamFiles.clear(); }
   notify('sync');
 }
+
+// ---- app updates (the host runs the GitHub check / download in a child process and reports back) ----------
+function onUpdate(d) {
+  const u = state.update;
+  if (d.running) {
+    u.phase = d.action === 'Stage' ? 'downloading' : 'checking';
+    u.pct = d.pct || 0; u.text = d.text || '';
+  } else {
+    const r = d.result || {};
+    u.pct = 0; u.text = ''; u.error = '';
+    if (r.status === 'error') { u.phase = 'error'; u.error = r.error || 'The update did not finish.'; }
+    else { u.phase = r.status || 'idle'; u.info = r; }
+  }
+  notify('update');
+}
+
+export async function checkUpdate({ quiet = false } = {}) {
+  const u = state.update;
+  if (u.phase === 'checking' || u.phase === 'downloading') return;
+  u.quiet = quiet; u.phase = 'checking'; u.error = ''; u.pct = 0; u.text = 'Asking GitHub for the latest release...';
+  notify('update');
+  try { await bridge.request('update.check'); } catch (e) { u.phase = 'error'; u.error = e.message; notify('update'); }
+}
+export async function downloadUpdate() {
+  const u = state.update;
+  u.quiet = false; u.phase = 'downloading'; u.pct = 0; u.text = 'Starting...'; notify('update');
+  try { await bridge.request('update.stage'); } catch (e) { u.phase = 'error'; u.error = e.message; notify('update'); }
+}
+export async function cancelUpdate() {
+  try { await bridge.request('update.cancel'); } catch { /* ignore */ }
+  state.update.phase = state.update.info?.status === 'available' ? 'available' : 'idle';
+  notify('update');
+}
+export async function installUpdate() {
+  try { await bridge.request('update.apply'); } catch (e) { state.update.phase = 'error'; state.update.error = e.message; notify('update'); }
+}
+export const updateReady = () => state.update.phase === 'available' || state.update.phase === 'staged';
 
 function onStandings(d) { state.standings = d; notify('standings'); }
 function onInjuries(d) { state.injuries = d; notify('injuries'); }
@@ -353,12 +391,14 @@ export async function init() {
   state.cacheDir = info.cacheDir || '';
   state.version = info.version || '';
   state.sample = !!info.sample;
+  state.update.note = info.updateNote || null;
   applyTheme();
 
   bridge.on('scoreboard', onScoreboard);
   bridge.on('box', (d) => { normBox(d.box); onBox(d); });
   bridge.on('live', onLive);
   bridge.on('sync', onSync);
+  bridge.on('update', onUpdate);
   bridge.on('standings', (d) => { d.conferences = asArray(d.conferences).map((c) => ({ ...c, teams: asArray(c.teams) })); onStandings(d); });
   bridge.on('injuries', (d) => { d.teams = asArray(d.teams).map((t) => ({ ...t, players: asArray(t.players) })); onInjuries(d); });
 
@@ -374,6 +414,7 @@ export async function init() {
   refreshCachedDays();
   loadStandings();
   loadInjuries();
+  if (state.host && state.settings.updateCheck !== false && !state.update.note) setTimeout(() => checkUpdate({ quiet: true }), 4000);
   // first-run default: the person's team is a good starting favorite only if they have none
   return state;
 }
