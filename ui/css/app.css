@@ -260,7 +260,7 @@ table.bio td { text-align: left; white-space: normal; }
 .tile b { display: block; font-size: 24px; font-variant-numeric: tabular-nums; }
 .tile small { color: var(--muted); font-size: 11px; letter-spacing: .06em; }
 h3.sub { margin: 16px 0 6px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
-section.card + section.card { margin-top: 16px; }
+.view > section.card + section.card { margin-top: 16px; }
 @media (max-width: 900px) { .pl-top { grid-template-columns: 1fr; } .psearch input { width: 150px; } }
 
 .sect-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
