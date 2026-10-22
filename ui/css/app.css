@@ -211,3 +211,16 @@ table.tbl { width: 100%; border-collapse: collapse; font-variant-numeric: tabula
 @keyframes bump { 0% { transform: scale(1.35); } 100% { transform: scale(1); } }
 @media (max-width: 700px) { .two { grid-template-columns: 1fr; } .grid.wide { grid-template-columns: 1fr; } .view { padding: 14px 12px 50px; } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* updates */
+.ver-btn { font-size: 12px; color: var(--muted); padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line); background: transparent; position: relative; }
+.ver-btn:hover { background: var(--surface2); color: var(--text); }
+.ver-btn.has-update { color: var(--text); border-color: var(--accent2); }
+.ver-btn.has-update::after { content: ""; position: absolute; top: -3px; right: -3px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent2); }
+.upd .muted, .upd small { color: var(--muted); }
+.upd-notes { margin: 10px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface2); max-height: 260px; overflow: auto; font-size: 13px; line-height: 1.5; }
+.upd-h { font-weight: 700; margin-top: 6px; }
+.upd-li { padding-left: 14px; position: relative; }
+.upd-li::before { content: "\2022"; position: absolute; left: 3px; }
+.upd-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+.upd-err { color: var(--warn); }

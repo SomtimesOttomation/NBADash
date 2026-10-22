@@ -105,7 +105,7 @@ export function attach(e) { emit = e; setInterval(tick, 4000); }
 export async function request(cmd, args) {
   await new Promise((r) => setTimeout(r, 15));
   switch (cmd) {
-    case 'init': return { settings, sync: { running: false, lastRun: new Date().toISOString() }, cacheDir: '(mock)', version: 'dev', sample: true };
+    case 'init': return { settings, sync: { running: false, lastRun: new Date().toISOString() }, cacheDir: '(mock)', version: '0.2.0', sample: true };
     case 'cache.read': {
       const p = args.path; let m;
       if (p === 'teams.json') return TEAMS;
@@ -141,6 +141,19 @@ export async function request(cmd, args) {
       }, 700);
       return true;
     }
+    case 'update.check': {
+      emit('update', { running: true, action: 'Check', pct: 2, text: 'Asking GitHub for the latest release...' });
+      setTimeout(() => emit('update', { running: false, action: 'Check', result: { status: 'available', current: '0.2.0', latest: '0.3.0', tag: 'v0.3.0', published: '2026-10-30T12:00:00Z', size: 74000, installable: true,
+        notes: '### Feature\n- Player search\n- Compare players\n\n### Bug/Fix\n- Box score columns line up' } }), 900);
+      return true;
+    }
+    case 'update.stage': {
+      let p = 5; emit('update', { running: true, action: 'Stage', pct: p, text: 'Downloading...' });
+      const t = setInterval(() => { p += 19; if (p >= 100) { clearInterval(t); emit('update', { running: false, action: 'Stage', result: { status: 'staged', current: '0.2.0', latest: '0.3.0' } }); return; } emit('update', { running: true, action: 'Stage', pct: p, text: `Downloading ${(p / 20).toFixed(1)} of 5.0 MB` }); }, 500);
+      return true;
+    }
+    case 'update.cancel': return true;
+    case 'update.apply': return true;
     case 'live.refresh': tick(); return true;
     case 'traffic.get': return { uptimeSec: (Date.now() - started) / 1000, ...stats, last: 'scoreboard' };
     default: throw new Error('mock: unknown ' + cmd);
