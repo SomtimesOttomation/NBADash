@@ -266,6 +266,21 @@ function Invoke-Command2 {
             if ($mode -eq 'team' -and $team -notmatch '^[A-Za-z]{2,4}$') { ReplyError $Msg.id 'bad team'; return }
             Reply $Msg.id ((Start-Sync $mode $team).ToString().ToLower())
         }
+        'player.get' {
+            $id = [string]$a.id
+            if ($id -notmatch '^\d{1,10}$') { ReplyError $Msg.id 'bad id'; return }
+            $p = Join-Path $CacheDir "players\$id.json"
+            $age = if (Test-Path $p) { ((Get-Date) - (Get-Item $p).LastWriteTime).TotalMinutes } else { 99999 }
+            if ($age -lt 180) { Reply $Msg.id ('{{"player":{0}}}' -f [IO.File]::ReadAllText($p, $utf8)); return }   # fresh enough
+            $script:Shared.Commands.Enqueue(@{ type = 'player'; id = $id })                                          # result arrives as a 'player' event
+            if (Test-Path $p) { Reply $Msg.id ('{{"pending":true,"player":{0}}}' -f [IO.File]::ReadAllText($p, $utf8)) } else { Reply $Msg.id '{"pending":true}' }
+        }
+        'player.search' {
+            $q = ([string]$a.q).Trim()
+            if ($q.Length -lt 2 -or $q.Length -gt 60 -or $q -notmatch "^[\p{L}\p{N} .'\-]+$") { Reply $Msg.id 'false'; return }
+            $script:Shared.Commands.Enqueue(@{ type = 'psearch'; q = $q })
+            Reply $Msg.id 'true'
+        }
         'update.check' { Reply $Msg.id ((Start-Updater 'Check').ToString().ToLower()) }
         'update.stage' { Reply $Msg.id ((Start-Updater 'Stage').ToString().ToLower()) }
         'update.cancel' {

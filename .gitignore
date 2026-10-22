@@ -3,6 +3,8 @@ lib/*.dll
 # probe and sync output
 probe-output/
 tools/probe-output/
+probe-player-output/
+tools/probe-player-output/
 *.zip
 *.log
 *.tmp

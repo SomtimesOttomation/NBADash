@@ -10,6 +10,10 @@ import * as leadersV from './views/leaders.js';
 import { openSettings } from './views/settings.js';
 import { openTraffic } from './views/traffic.js';
 import { openUpdate } from './views/update.js';
+import * as playerV from './views/player.js';
+import * as compareV from './views/compare.js';
+import { initPlayerSearch } from './views/psearch.js';
+import { renderCompareBar } from './views/cmpbar.js';
 
 const $ = (s) => document.querySelector(s);
 const view = $('#view');
@@ -24,7 +28,7 @@ export function toast(msg) {
 function route() {
   const hash = location.hash.replace(/^#\/?/, '');
   const [name, arg] = hash.split('/');
-  const map = { '': home, team: teamV, game: gameV, standings, leaders: leadersV };
+  const map = { '': home, team: teamV, game: gameV, standings, leaders: leadersV, player: playerV, compare: compareV };
   const mod = map[name] || home;
   const routeName = map[name] ? (name || 'home') : 'home';
   document.querySelectorAll('#nav a').forEach((a) => a.classList.toggle('active', a.dataset.route === routeName));
@@ -115,13 +119,14 @@ S.subscribe((topics) => {
   if (topics.has('live') || topics.has('days')) liveStatus();
   if (topics.has('sync')) syncBar();
   if (topics.has('update')) { versionChip(); updateToast(); }
+  if (topics.has('compare')) renderCompareBar($('#cmpbar'));
   current?.mod.update?.(topics, current.ctx);
 });
 setInterval(liveStatus, 15000);
 
 window.addEventListener('hashchange', route);
 S.init().then(() => {
-  themeIcon(); liveStatus(); route(); versionChip();
+  themeIcon(); liveStatus(); route(); versionChip(); initPlayerSearch(); renderCompareBar($('#cmpbar'));
   const n = S.state.update.note;
   if (n) toast(n.ok ? `Updated to v${n.to}.` : `The update to v${n.to} did not work (${n.reason || 'unknown reason'}). v${n.from} was restored.`);
 }).catch((e) => {

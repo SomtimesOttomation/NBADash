@@ -10,11 +10,12 @@ function New-NbaShared {
     param([string]$CacheDir, [int]$LiveSeconds = 30,
           [string]$EspnBase = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba',
           [string]$EspnWebBase = 'https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba',
-          [string]$EspnV2Base = 'https://site.api.espn.com/apis/v2/sports/basketball/nba')
+          [string]$EspnV2Base = 'https://site.api.espn.com/apis/v2/sports/basketball/nba',
+          [string]$EspnCommonBase = 'https://site.web.api.espn.com/apis/common/v3')
     $traffic = [hashtable]::Synchronized(@{ Requests = 0; Errors = 0; Bytes = [long]0; Wire = [long]0; Last = ''; ByKind = @{}; Started = (Get-Date) })
     return [hashtable]::Synchronized(@{
         CacheDir = $CacheDir; LiveSeconds = $LiveSeconds
-        EspnBase = $EspnBase; EspnWebBase = $EspnWebBase; EspnV2Base = $EspnV2Base
+        EspnBase = $EspnBase; EspnWebBase = $EspnWebBase; EspnV2Base = $EspnV2Base; EspnCommonBase = $EspnCommonBase
         Queue = New-Object 'System.Collections.Concurrent.ConcurrentQueue[string]'
         Commands = New-Object 'System.Collections.Concurrent.ConcurrentQueue[object]'
         Watch = [hashtable]::Synchronized(@{})
@@ -167,6 +168,65 @@ function ConvertTo-NbaInjuries {
     return [pscustomobject]@{ syncedAt = (Get-Date).ToString('s'); teams = $teams }
 }
 
+
+function ConvertTo-NbaPlayer {
+    # Compacts ESPN's athlete + stats feeds into one small object: bio, plus season-by-season averages/totals/misc.
+    param($Ath, $Stats)
+    $a = $Ath.athlete
+    $dob = ''
+    if ([string]$a.displayDOB -match '^(\d{1,2})/(\d{1,2})/(\d{4})$') { $dob = '{0}-{1:00}-{2:00}' -f $Matches[3], [int]$Matches[2], [int]$Matches[1] }
+    $college = ''
+    if ($a.college) { if ($a.college -is [string]) { $college = $a.college } elseif ($a.college.name) { $college = [string]$a.college.name } }
+    if (-not $college -and $a.displayCollege) { $college = [string]$a.displayCollege }
+    $bio = [pscustomobject]@{
+        id = [string]$a.id; name = [string]$a.displayName; jersey = [string]$a.jersey
+        pos = [string]$a.position.abbreviation; posName = [string]$a.position.displayName
+        teamId = [string]$a.team.id; team = [string]$a.team.abbreviation; teamName = [string]$a.team.displayName
+        headshot = [string]$a.headshot.href
+        height = [string]$a.displayHeight; weight = [string]$a.displayWeight; age = $a.age; dob = $dob
+        birthPlace = [string]$a.displayBirthPlace; draft = [string]$a.displayDraft; experience = [string]$a.displayExperience
+        college = $college; citizenship = [string]$a.citizenship; status = [string]$a.status.name; debutYear = $a.debutYear
+    }
+    $cats = @{}
+    foreach ($c in @($Stats.categories)) { $cats[[string]$c.name] = $c }
+    $rows = [ordered]@{}
+    $career = @{}
+    foreach ($k in 'averages', 'totals', 'miscellaneous') {
+        $c = $cats[$k]
+        if (-not $c) { continue }
+        $career[$k] = @($c.totals)
+        foreach ($r in @($c.statistics)) {
+            $key = '{0}|{1}|{2}' -f $r.season.year, $r.season.displayName, $r.teamId
+            if (-not $rows.Contains($key)) {
+                $rows[$key] = @{ year = [int]$r.season.year; season = [string]$r.season.displayName; teamId = [string]$r.teamId; team = [string]$r.teamSlug; avg = @(); tot = @(); misc = @() }
+            }
+            $f = switch ($k) { 'averages' { 'avg' } 'totals' { 'tot' } default { 'misc' } }
+            $rows[$key][$f] = @($r.stats)
+        }
+    }
+    $seasons = @($rows.Values | ForEach-Object { [pscustomobject]$_ })
+    $lab = { param($n) if ($cats[$n]) { @($cats[$n].labels) } else { @() } }
+    return [pscustomobject]@{
+        syncedAt = (Get-Date).ToString('s'); season = [int]$Ath.season.year; seasonName = [string]$Ath.season.displayName
+        bio = $bio
+        avgLabels = (& $lab 'averages'); totLabels = (& $lab 'totals'); miscLabels = (& $lab 'miscellaneous')
+        seasons = $seasons
+        career = [pscustomobject]@{ avg = @($career['averages']); tot = @($career['totals']); misc = @($career['miscellaneous']) }
+    }
+}
+
+function ConvertTo-NbaPlayerSearch {
+    param($Res)
+    $items = @($Res.items | Where-Object { $_.type -eq 'player' } | ForEach-Object {
+        $team = [string]$_.label -replace '^NBA\s*-\s*', ''
+        [pscustomobject]@{
+            id = [string]$_.id; name = [string]$_.displayName; team = $team; jersey = [string]$_.jersey
+            pos = [string]$_.position.abbreviation; active = [bool]$_.isActive; retired = [bool]$_.isRetired; headshot = [string]$_.headshot.href
+        }
+    })
+    return $items
+}
+
 # ---------------------------------------------------------------- time helpers
 function Get-NbaEasternNow {
     foreach ($id in 'Eastern Standard Time', 'America/New_York') {
@@ -204,6 +264,21 @@ function Invoke-NbaWorker {
                 if ($cmd.type -eq 'box' -and $cmd.id) {
                     if (-not $box.ContainsKey($cmd.id)) { $box[$cmd.id] = @{ nextAt = [DateTime]::MinValue; done = $false } }
                     $box[$cmd.id].nextAt = [DateTime]::MinValue; $box[$cmd.id].oneShot = $true
+                }
+                elseif ($cmd.type -eq 'player' -and $cmd.id) {
+                    $ath = Get-NbaJson -Shared $Shared -Url ("{0}/sports/basketball/nba/athletes/{1}" -f $Shared.EspnCommonBase, $cmd.id) -Kind 'player'
+                    if (-not $ath -or -not $ath.athlete) { Push-NbaEvent $Shared 'player' @{ id = $cmd.id; error = 'ESPN did not return this player right now.' }; continue }
+                    $st = Get-NbaJson -Shared $Shared -Url ("{0}/sports/basketball/nba/athletes/{1}/stats" -f $Shared.EspnCommonBase, $cmd.id) -Kind 'player'
+                    $pm = ConvertTo-NbaPlayer -Ath $ath -Stats $st
+                    New-Item -ItemType Directory -Path (Join-Path $cache 'players') -Force | Out-Null
+                    Save-NbaJsonFile (Join-Path $cache ("players\{0}.json" -f $cmd.id)) $pm
+                    Push-NbaEvent $Shared 'player' @{ id = $cmd.id; player = $pm }
+                }
+                elseif ($cmd.type -eq 'psearch' -and $cmd.q) {
+                    $url = "{0}/search?query={1}&limit=8&type=player&sport=basketball&league=nba" -f $Shared.EspnCommonBase, [Uri]::EscapeDataString([string]$cmd.q)
+                    $res = Get-NbaJson -Shared $Shared -Url $url -Kind 'search'
+                    $items = if ($res) { @(ConvertTo-NbaPlayerSearch $res) } else { @() }
+                    Push-NbaEvent $Shared 'psearch' @{ q = [string]$cmd.q; ok = [bool]$res; items = $items }
                 }
             }
 
@@ -290,4 +365,4 @@ function Invoke-NbaWorker {
     }
 }
 
-Export-ModuleMember -Function New-NbaShared, Invoke-NbaWorker, Get-NbaJson, Save-NbaJsonFile, ConvertTo-NbaDay, ConvertTo-NbaBox, ConvertTo-NbaStandings, ConvertTo-NbaInjuries, Add-NbaTraffic, Push-NbaEvent
+Export-ModuleMember -Function ConvertTo-NbaPlayer, ConvertTo-NbaPlayerSearch, New-NbaShared, Invoke-NbaWorker, Get-NbaJson, Save-NbaJsonFile, ConvertTo-NbaDay, ConvertTo-NbaBox, ConvertTo-NbaStandings, ConvertTo-NbaInjuries, Add-NbaTraffic, Push-NbaEvent

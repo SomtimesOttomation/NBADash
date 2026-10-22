@@ -21,6 +21,11 @@
         <a href="#/standings" data-route="standings">Standings</a>
         <a href="#/leaders" data-route="leaders">League Leaders</a>
       </nav>
+      <div class="psearch">
+        <div id="psearch-ghost" class="psearch-ghost" aria-hidden="true"></div>
+        <input id="psearch" type="search" placeholder="Search players  ( / )" autocomplete="off" spellcheck="false" aria-label="Search players">
+        <div id="psearch-results" class="psearch-results" hidden></div>
+      </div>
       <div class="topbar-right">
         <button id="btn-version" class="ver-btn" type="button" hidden title="Check for updates"></button>
         <span id="live-status" class="live-status" title=""></span>
@@ -34,6 +39,7 @@
     </div>
     <main id="view" class="view" tabindex="-1"></main>
   </div>
+  <div id="cmpbar" class="cmpbar" hidden></div>
   <div id="overlay-root"></div>
   <div id="toasts" class="toasts" aria-live="polite"></div>
   <script type="module" src="js/app.js"></script>
