@@ -66,6 +66,19 @@ $runId  = (Get-Date).ToString('yyyyMMdd-HHmmss')
 $logFile = Join-Path $CacheDir ("logs\sync-" + (Get-Date).ToString('yyyyMMdd') + '.log')
 $script:Traffic = New-Object System.Collections.ArrayList
 $script:Errors  = 0
+# user-adjustable timing from settings.json (an explicit command-line value wins)
+$tuneSrc = $null
+if (Test-Path $SettingsPath) { try { $tuneSrc = Get-Content $SettingsPath -Raw | ConvertFrom-Json } catch { } }
+function Get-Tune {
+    param([string]$Name, [double]$Default, [double]$Min, [double]$Max)
+    $v = $null
+    if ($tuneSrc -and $null -ne $tuneSrc.$Name) { try { $v = [double]$tuneSrc.$Name } catch { } }
+    if ($null -eq $v) { return $Default }
+    return [Math]::Min($Max, [Math]::Max($Min, $v))
+}
+$TeamFreshHours  = Get-Tune 'teamFreshHours' 20 1 168
+$TableFreshHours = Get-Tune 'tableFreshHours' 4 1 48
+if (-not $PSBoundParameters.ContainsKey('MaxBackfillDays')) { $MaxBackfillDays = [int](Get-Tune 'backfillDays' 7 1 30) }
 if ($Quick) { $MaxBackfillDays = 2 }
 
 function Write-Log {
@@ -235,7 +248,7 @@ foreach ($tm in $ordered) {
     $ti++
     Set-Progress (8 + 62 * ($ti - 1) / [Math]::Max(1, $ordered.Count)) ("Team {0} ({1} of {2})" -f $tm.abbr, $ti, $ordered.Count)
     $teamPath = Join-Path $CacheDir ("teams\" + $tm.abbr + '.json')
-    if (Test-Fresh $teamPath 20) { Write-Log "Team $($tm.abbr): fresh, skipped"; continue }
+    if (Test-Fresh $teamPath $TeamFreshHours) { Write-Log "Team $($tm.abbr): fresh, skipped"; continue }
     Write-Log "Team $($tm.abbr)"
     $d = Get-Json "$espn/teams/$($tm.id)" 'team' ("team-" + $tm.abbr)
     $r = Get-Json "$espn/teams/$($tm.id)/roster" 'roster' ("roster-" + $tm.abbr)
@@ -283,7 +296,7 @@ foreach ($tm in $ordered) {
 
 # ---------------------------------------------------------------- 3. standings
 $stPath = Join-Path $CacheDir 'standings.json'
-if (-not $HistoryOnly -and -not (Test-Fresh $stPath 4)) {
+if (-not $HistoryOnly -and -not (Test-Fresh $stPath $TableFreshHours)) {
     Write-Log 'Standings'
     Set-Progress 72 'Standings'
     $st = Get-Json "$EspnBase/apis/v2/sports/basketball/nba/standings" 'standings' 'standings'
@@ -305,7 +318,7 @@ if (-not $HistoryOnly -and -not (Test-Fresh $stPath 4)) {
 
 # ---------------------------------------------------------------- 4. injuries
 $injPath = Join-Path $CacheDir 'injuries.json'
-if (-not $HistoryOnly -and -not (Test-Fresh $injPath 4)) {
+if (-not $HistoryOnly -and -not (Test-Fresh $injPath $TableFreshHours)) {
     Write-Log 'Injuries'
     Set-Progress 76 'Injuries'
     $inj = Get-Json "$espn/injuries" 'injuries' 'injuries'

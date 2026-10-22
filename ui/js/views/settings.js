@@ -25,18 +25,62 @@ export function openSettings() {
       h('h2', null, 'Settings'),
       h('p', null, h('b', null, 'Theme '),
         ['system', 'light', 'dark'].map((t) => h('button', { class: `btn ${s.theme === t ? 'primary' : ''}`, type: 'button', style: { marginRight: '6px' }, onclick: () => { S.saveSettings({ theme: t }); close(); } }, t))),
-      h('p', null, h('label', null, h('input', { type: 'checkbox', checked: s.autoWatch ? true : null, onchange: (e) => S.saveSettings({ autoWatch: e.target.checked }) }),
-        ' Automatically watch live box scores for my favorite teams')),
       h('p', null, h('label', null, h('input', { type: 'checkbox', checked: s.updateCheck !== false ? true : null, onchange: (e) => S.saveSettings({ updateCheck: e.target.checked }) }),
         ' Check GitHub for a new version when the app starts '), h('button', { class: 'btn', type: 'button', style: { marginLeft: '8px' }, onclick: () => { close(); openUpdate(); } }, `v${S.state.version || '?'} - Check for updates`)),
       h('p', null, h('b', null, 'Favorites '), favs.size ? [...favs].map((a) => h('span', { style: { marginRight: '6px' } }, teamLogo(a, 26))) : h('small', null, 'none yet – star a team in the banner')),
       h('hr', { style: { border: 0, borderTop: '1px solid var(--line)' } }),
       h('p', null, h('b', null, 'Data cache '), h('small', null, S.state.cacheDir || '(dev preview)')),
       syncPanel(),
+      h('hr', { style: { border: 0, borderTop: '1px solid var(--line)' } }),
+      timingPanel(),
       h('p', { style: { textAlign: 'right' } }, h('button', { class: 'btn primary', type: 'button', onclick: close }, 'Done')));
   });
 }
 void displayCode;
+
+// Automatic refresh is opt-in. Off (default): ESPN is contacted only when the person presses refresh, opens a box score or runs a sync.
+// On: the person has accepted the warning and can tune how often the app polls. Values are clamped and saved on change.
+function timingPanel() {
+  const box = h('div');
+  let confirming = false;
+  const paint = () => {
+    const s = S.state.settings;
+    if (!s.autoRefresh) {
+      const ack = h('input', { type: 'checkbox' });
+      const go = h('button', { class: 'btn primary', type: 'button', disabled: true, onclick: () => { S.saveSettings({ autoRefresh: true }); confirming = false; paint(); } }, 'Turn on automatic refresh');
+      ack.addEventListener('change', () => { go.disabled = !ack.checked; });
+      box.replaceChildren(
+        h('p', null, h('b', null, 'Data refresh: manual '), h('small', null, 'NBADash only contacts ESPN when you press the refresh button (top right, or F5), open a box score, or run a sync above.')),
+        confirming
+          ? h('div', { class: 'card pad warn' },
+              h('b', null, 'Before you turn this on'),
+              h('p', null, 'Automatic refresh polls ESPN\u2019s servers repeatedly while the app is open. ESPN has no official public API and does not publish limits for it. Polling too often can get your connection rate-limited or blocked by ESPN, and could lead to a longer ban. You are responsible for the cadence you choose; the defaults are deliberately gentle.'),
+              h('label', null, ack, ' I understand and accept this risk'),
+              h('div', { style: { marginTop: '8px', display: 'flex', gap: '8px' } }, go, h('button', { class: 'btn', type: 'button', onclick: () => { confirming = false; paint(); } }, 'Cancel')))
+          : h('button', { class: 'btn', type: 'button', onclick: () => { confirming = true; paint(); } }, 'Enable automatic refresh\u2026'));
+      return;
+    }
+    const rows = Object.entries(S.TUNING).map(([key, [def, min, max, label, unit, help]]) => {
+      const input = h('input', { type: 'number', min, max, step: 1, value: s[key] ?? def, class: 'tune-input', 'aria-label': label, 'data-key': key,
+        onchange: (e) => { let v = Math.round(Number(e.target.value)); if (!Number.isFinite(v)) v = def; v = Math.min(max, Math.max(min, v)); e.target.value = v; S.saveSettings({ [key]: v }); } });
+      return h('label', { class: 'tune-row', title: help }, h('span', null, label, h('small', null, help)), h('span', { class: 'tune-val' }, input, ' ', unit));
+    });
+    box.replaceChildren(
+      h('p', null, h('b', null, 'Data refresh: automatic '), h('button', { class: 'btn', type: 'button', style: { marginLeft: '8px' }, onclick: () => { S.saveSettings({ autoRefresh: false }); paint(); } }, 'Switch back to manual')),
+      h('p', null, h('small', { class: 'warn-text' }, 'Automatic refresh can get you rate-limited or banned by ESPN if set too aggressively.')),
+      h('p', null, h('label', null, h('input', { type: 'checkbox', checked: s.autoWatch ? true : null, onchange: (e) => S.saveSettings({ autoWatch: e.target.checked }) }),
+        ' Automatically watch live box scores for my favorite teams')),
+      h('p', null, h('label', null, h('input', { type: 'checkbox', checked: s.autoHistory !== false ? true : null, onchange: (e) => S.saveSettings({ autoHistory: e.target.checked }) }),
+        ' Fill in missing season days automatically at startup')),
+      h('p', null, h('b', null, 'Refresh timing '), h('button', { class: 'btn', type: 'button', style: { marginLeft: '8px' }, onclick: () => {
+        S.saveSettings({ ...S.TUNE_DEFAULTS }); document.querySelectorAll('.tune-input').forEach((i) => { i.value = S.TUNE_DEFAULTS[i.dataset.key]; });
+      } }, 'Reset to defaults')),
+      h('div', { class: 'tune' }, rows),
+      h('small', null, 'Live, idle and standings changes apply immediately; the sync values apply to the next sync, including the nightly task.'));
+  };
+  paint();
+  return box;
+}
 
 // Live status for the sync buttons: progress bar, current step, last result. Repaints on every 'sync' event.
 function syncPanel() {

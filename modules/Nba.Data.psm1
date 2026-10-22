@@ -15,6 +15,9 @@ function New-NbaShared {
     $traffic = [hashtable]::Synchronized(@{ Requests = 0; Errors = 0; Bytes = [long]0; Wire = [long]0; Last = ''; ByKind = @{}; Started = (Get-Date) })
     return [hashtable]::Synchronized(@{
         CacheDir = $CacheDir; LiveSeconds = $LiveSeconds
+        # user-adjustable timing (minutes unless named otherwise); the host overwrites these from settings
+        Auto = $false      # automatic fetching is opt-in; when false the worker only fetches what the person asks for
+        Tune = [hashtable]::Synchronized(@{ IdleMinutes = 10; OldDayHours = 6; TableLiveMinutes = 15; TableStaleHours = 6 })
         EspnBase = $EspnBase; EspnWebBase = $EspnWebBase; EspnV2Base = $EspnV2Base; EspnCommonBase = $EspnCommonBase
         Queue = New-Object 'System.Collections.Concurrent.ConcurrentQueue[string]'
         Commands = New-Object 'System.Collections.Concurrent.ConcurrentQueue[object]'
@@ -256,6 +259,7 @@ function Invoke-NbaWorker {
         try {
             $now = [DateTime]::UtcNow
             $force = [bool]$Shared.RefreshNow
+            $auto = [bool]$Shared.Auto
             $Shared.RefreshNow = $false
             $live = [Math]::Max(10, [int]$Shared.LiveSeconds)
 
@@ -288,6 +292,7 @@ function Invoke-NbaWorker {
             foreach ($ds in $keys) {
                 if (-not $day.ContainsKey($ds)) { $day[$ds] = @{ nextAt = [DateTime]::MinValue; json = ''; allFinal = $false; anyLive = $false } }
                 $d = $day[$ds]
+                if (-not $auto -and -not $force) { continue }      # manual mode: only the refresh button fetches scoreboards
                 if (-not $force -and $now -lt $d.nextAt) { if ($d.anyLive) { $anyLiveNow = $true }; continue }
                 $sb = Get-NbaJson -Shared $Shared -Url ("{0}/scoreboard?dates={1}" -f $Shared.EspnBase, $ds) -Kind 'scoreboard'
                 if (-not $sb) {
@@ -305,8 +310,8 @@ function Invoke-NbaWorker {
                 if ($stamp -ne $d.json -or $force) { $d.json = $stamp; Push-NbaEvent $Shared 'scoreboard' $model }
                 Push-NbaEvent $Shared 'live' @{ ok = $true; error = ''; at = [long](([DateTimeOffset]::UtcNow).ToUnixTimeMilliseconds()); anyLive = $anyLiveNow; interval = $live }
                 if ($d.anyLive -or $soon) { $d.nextAt = $now.AddSeconds($live) }
-                elseif ($d.allFinal -and $ds -ne $keys[0]) { $d.nextAt = $now.AddHours(6) }
-                else { $d.nextAt = $now.AddMinutes(10) }
+                elseif ($d.allFinal -and $ds -ne $keys[0]) { $d.nextAt = $now.AddHours([double]$Shared.Tune.OldDayHours) }
+                else { $d.nextAt = $now.AddMinutes([double]$Shared.Tune.IdleMinutes) }
                 # keep a copy for next launch; never replace a day the sync already completed
                 $sbPath = Join-Path $cache ("scoreboards\$ds.json")
                 $write = $true
@@ -319,19 +324,24 @@ function Invoke-NbaWorker {
             }
 
             # box scores for watched / requested games
-            $want = @($Shared.Watch.Keys) + @($box.Keys | Where-Object { $box[$_].oneShot })
+            $want = @(if ($auto) { $Shared.Watch.Keys }) + @($box.Keys | Where-Object { $box[$_].oneShot })
             foreach ($id in ($want | Select-Object -Unique)) {
                 if (-not $box.ContainsKey($id)) { $box[$id] = @{ nextAt = [DateTime]::MinValue; done = $false } }
                 $b = $box[$id]
                 $ev = $known[$id]
-                $state = if ($ev) { $ev.state } else { 'post' }
+                $state = if ($ev) { $ev.state } else { 'unknown' }
                 if ($state -eq 'pre') { $b.oneShot = $false; continue }
                 if ($b.done -and -not $force) { continue }
                 if (-not $force -and $now -lt $b.nextAt) { continue }
                 $sum = Get-NbaJson -Shared $Shared -Url ("{0}/summary?region=us&lang=en&contentorigin=espn&event={1}" -f $Shared.EspnWebBase, $id) -Kind 'boxscore'
                 if (-not $sum -or -not $sum.boxscore) { $sum = Get-NbaJson -Shared $Shared -Url ("{0}/summary?event={1}" -f $Shared.EspnBase, $id) -Kind 'boxscore' }
                 $b.nextAt = $now.AddSeconds($live)
-                if (-not $sum -or -not $sum.boxscore) { continue }
+                if (-not $sum -or -not $sum.boxscore) { if (-not $auto) { $b.oneShot = $false }; continue }
+                if ($state -eq 'unknown') {
+                    # no scoreboard fetched yet (manual mode): take the game state from the summary itself; never cache a game as final unless ESPN says so
+                    $st0 = try { [string]$sum.header.competitions[0].status.type.state } catch { '' }
+                    $state = if ($st0) { $st0 } else { 'unknown' }
+                }
                 $evForBox = if ($ev) { $ev } else { [pscustomobject]@{ id = $id; date = ''; name = '' } }
                 $model = ConvertTo-NbaBox -Sum $sum -Game $evForBox
                 Push-NbaEvent $Shared 'box' @{ eventId = $id; box = $model }
@@ -340,21 +350,21 @@ function Invoke-NbaWorker {
                     $b.done = $true
                     if ($Shared.Watch.ContainsKey($id)) { $Shared.Watch.Remove($id) }
                 }
-                if ($b.oneShot -and $state -ne 'in') { $b.oneShot = $false }
+                if ($b.oneShot -and ($state -ne 'in' -or -not $auto)) { $b.oneShot = $false }
                 if ($b.oneShot -and -not $Shared.Watch.ContainsKey($id)) { $b.oneShot = $false }
             }
 
             # standings and injuries: every 15 minutes while games are live, otherwise when the cache is stale
             $stPath = Join-Path $cache 'standings.json'; $injPath = Join-Path $cache 'injuries.json'
-            $stDue = if ($anyLiveNow) { $now -ge $next.standings } else { ((& $fileAge $stPath) -gt 360) -and ($now -ge $next.standings) }
+            $stDue = if (-not $auto) { $force } elseif ($anyLiveNow) { $now -ge $next.standings } else { ((& $fileAge $stPath) -gt ([double]$Shared.Tune.TableStaleHours * 60)) -and ($now -ge $next.standings) }
             if ($stDue) {
-                $next.standings = $now.AddMinutes(15)
+                $next.standings = $now.AddMinutes([double]$Shared.Tune.TableLiveMinutes)
                 $st = Get-NbaJson -Shared $Shared -Url ("{0}/standings" -f $Shared.EspnV2Base) -Kind 'standings'
                 if ($st) { $m = ConvertTo-NbaStandings $st; Save-NbaJsonFile $stPath $m; Push-NbaEvent $Shared 'standings' $m }
             }
-            $injDue = if ($anyLiveNow) { $now -ge $next.injuries } else { ((& $fileAge $injPath) -gt 360) -and ($now -ge $next.injuries) }
+            $injDue = if (-not $auto) { $force } elseif ($anyLiveNow) { $now -ge $next.injuries } else { ((& $fileAge $injPath) -gt ([double]$Shared.Tune.TableStaleHours * 60)) -and ($now -ge $next.injuries) }
             if ($injDue) {
-                $next.injuries = $now.AddMinutes(15)
+                $next.injuries = $now.AddMinutes([double]$Shared.Tune.TableLiveMinutes)
                 $inj = Get-NbaJson -Shared $Shared -Url ("{0}/injuries" -f $Shared.EspnBase) -Kind 'injuries'
                 if ($inj) { $m = ConvertTo-NbaInjuries $inj; Save-NbaJsonFile $injPath $m; Push-NbaEvent $Shared 'injuries' $m }
             }

@@ -148,9 +148,10 @@ export function gameCard(ev, opts = {}) {
       statusPill(ev),
       h('span', { class: 'game-head-right' },
         ev.state === 'in' ? h('button', {
-          class: `watch ${watched ? 'on' : ''}`, type: 'button', title: watched ? 'Stop live box score' : 'Watch live box score',
+          class: `watch ${watched ? 'on' : ''}`, type: 'button',
+          title: S.state.settings.autoRefresh ? (watched ? 'Stop live box score' : 'Watch live box score') : 'Fetch the box score once (automatic refresh is off)',
           onclick: (e) => { e.stopPropagation(); S.setWatch(ev.id, !watched); },
-        }, watched ? '● Watching' : '○ Watch') : null,
+        }, S.state.settings.autoRefresh ? (watched ? '● Watching' : '○ Watch') : '↻ Box score') : null,
         isFavGame ? h('span', { class: 'fav-tag', title: 'Favorite team' }, '★') : null)),
     h('div', { class: 'sides' }, away ? sideRow(ev, away, opts) : null, home ? sideRow(ev, home, opts) : null),
     h('footer', { class: 'game-foot' },

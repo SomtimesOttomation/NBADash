@@ -4,6 +4,18 @@ import { etKey, addDaysKey, asArray, fmtKey } from './util.js';
 import { toEspnCode } from './arenas.js';
 import { aggregate, newLeague, leagueAdd, LEAGUE_VERSION } from './stats.js';
 
+// user-adjustable timing: [default, min, max, label, unit, help]
+export const TUNING = {
+  liveSeconds:      [30, 10, 300, 'Live scores', 'seconds', 'How often scores and the watched box score refresh while a game is live or about to start'],
+  idleMinutes:      [10, 1, 120, 'Scoreboard when idle', 'minutes', 'How often today\'s scoreboard is checked when nothing is live'],
+  oldDayHours:      [6, 1, 48, 'Finished earlier days', 'hours', 'How often a past day whose games are all final is re-checked'],
+  tableLiveMinutes: [15, 5, 120, 'Standings and injuries (games live)', 'minutes', 'Refresh interval while games are live'],
+  tableStaleHours:  [6, 1, 48, 'Standings and injuries (idle)', 'hours', 'Refresh only when the saved copy is older than this'],
+  teamFreshHours:   [20, 1, 168, 'Team files (sync)', 'hours', 'Rosters, coaches and schedules newer than this are skipped by a sync'],
+  tableFreshHours:  [4, 1, 48, 'Standings and injuries (sync)', 'hours', 'A sync skips them if the saved copy is newer than this'],
+  backfillDays:     [7, 1, 30, 'Sync catch-up window', 'days', 'How many days back a normal sync looks for missed games'],
+};
+export const TUNE_DEFAULTS = Object.fromEntries(Object.entries(TUNING).map(([k, v]) => [k, v[0]]));
 export const state = {
   ready: false,
   host: bridge.isHost,
@@ -13,7 +25,7 @@ export const state = {
   teams: [],
   byAbbr: new Map(),
   byId: new Map(),
-  settings: { favorites: [], theme: 'system', liveSeconds: 30, autoWatch: true, updateCheck: true },
+  settings: { favorites: [], theme: 'system', liveSeconds: 30, autoWatch: true, updateCheck: true, autoHistory: true, autoRefresh: false, ...TUNE_DEFAULTS },
   days: new Map(),          // 'yyyymmdd' -> { key, events, allFinal, source, at }
   cachedDayKeys: [],
   teamFiles: new Map(),     // abbr -> file | null
@@ -293,7 +305,7 @@ function onStandings(d) { state.standings = d; notify('standings'); }
 function onInjuries(d) { state.injuries = d; notify('injuries'); }
 
 function autoWatch() {
-  if (!state.settings.autoWatch) return;
+  if (!state.settings.autoRefresh || !state.settings.autoWatch) return;
   const fav = favSet();
   for (const e of allEvents()) {
     if (e.state === 'in' && e.sides.some((s) => fav.has(s.abbr)) && !state.watch.has(e.id)) setWatch(e.id, true);
@@ -303,7 +315,7 @@ function autoWatch() {
 // ---- actions -------------------------------------------------------------------------
 export async function setWatch(id, on) {
   id = String(id);
-  if (on) state.watch.add(id); else state.watch.delete(id);
+  if (on && state.settings.autoRefresh) state.watch.add(id); else state.watch.delete(id);   // manual mode: one fetch, no live polling
   notify('watch');
   try { await bridge.request('watch.set', { id, on }); } catch (e) { console.warn(e.message); }
 }
@@ -341,7 +353,7 @@ export function toggleFavorite(abbr) {
   const list = [...fav];
   // keep any team the person starred first at the front only visually; storage order is irrelevant
   saveSettings({ favorites: list });
-  if (!fav.has(abbr)) return;
+  if (!fav.has(abbr) || !state.settings.autoRefresh) return;
   // A newly starred team: ask the host to refresh it right away (favorites first).
   runSync('favorites');
 }
@@ -366,7 +378,7 @@ export async function refreshCachedDays() {
 // First run (or any run with gaps): quietly fetch one scoreboard per missing day since opening night.
 let historyTried = false;
 function autoHistory() {
-  if (historyTried || !state.host || state.sample || state.settings.autoHistory === false) return;
+  if (historyTried || !state.host || state.sample || !state.settings.autoRefresh || state.settings.autoHistory === false) return;
   historyTried = true;
   const have = new Set(state.cachedDayKeys);
   const last = yesterdayKey();

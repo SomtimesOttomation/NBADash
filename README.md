@@ -37,6 +37,12 @@ The home page shows today and last night. Everything earlier lives under the **W
 - Settings has **Fill in season history** (scoreboards only) and **Download full season history** (also every missing box score, about 8 KB per game). Both can be cancelled and pick up where they stopped.
 - Everything is fetched straight from ESPN to your own computer; nothing is shared or uploaded.
 
+## Manual refresh by default, optional automatic refresh
+
+Out of the box NBADash **does not poll ESPN on its own**. It contacts ESPN only when you press the refresh button (top right, or F5), open or refresh a box score, run a sync from Settings, or search for a player. The nightly scheduled task (if you registered one) is separate and still runs when you scheduled it.
+
+You can opt in to automatic refresh in Settings. It shows a warning (ESPN publishes no limits for this API, and polling too often can get you rate-limited or blocked) and needs a confirmation. Once on, you control the cadence: live-score interval, idle scoreboard interval, how often finished days and standings/injuries are re-checked, and how fresh a sync treats saved team files, standings and injuries. Values are clamped to safe ranges and **Reset to defaults** restores them. Auto-watching favorite games and the startup season-history fill are only active in automatic mode. The sync values are also used by the nightly task, which reads them from your settings file.
+
 ## Updating
 The version number next to the settings button (for example `v0.2.0`) opens the update window. It checks the latest
 GitHub release of this repository, shows its release notes, downloads the update package, verifies its SHA-256 against the
