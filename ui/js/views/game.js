@@ -1,7 +1,7 @@
 import * as S from '../store.js';
 import { h, fmtKey, etKey } from '../util.js';
 import { displayCode } from '../arenas.js';
-import { gameCard, emptyState, sectionHead, statusPill, avatar, teamLogo } from '../components.js';
+import { gameCard, emptyState, sectionHead, statusPill, avatar, teamLogo, playerLink } from '../components.js';
 import { playersOfGame } from '../stats.js';
 
 let which = 0;
@@ -51,7 +51,7 @@ function pyramid(box) {
   const card = (p, i) => h('div', { class: `pog-card rank${i + 1}` },
     h('span', { class: 'pog-badge' }, i === 0 ? '\u2605 Player of the game' : i === 1 ? '2nd' : '3rd'),
     avatar(p.name, heads.get(String(p.id)), 80),
-    h('b', { class: 'pog-name' }, p.name),
+    h('b', { class: 'pog-name' }, playerLink(p.id, p.name)),
     h('span', { class: 'pog-team' }, teamLogo(p.team, 20), displayCode(p.team), p.pos ? ` \u00b7 ${p.pos}` : ''),
     h('span', { class: 'pog-line' }, `${p.line.pts} PTS \u00b7 ${p.line.reb} REB \u00b7 ${p.line.ast} AST`),
     h('span', { class: 'pog-line' }, `${p.line.stl} STL \u00b7 ${p.line.blk} BLK \u00b7 ${p.line.fgm}/${p.line.fga} FG`),
@@ -77,8 +77,8 @@ function playersTable(t) {
   const lab = t.labels;
   const starters = t.players.filter((p) => p.starter), bench = t.players.filter((p) => !p.starter);
   const row = (p) => p.dnp
-    ? h('tr', { class: 'muted' }, h('td', null, p.name), h('td', { colspan: lab.length, style: { textAlign: 'left' } }, p.reason || 'DNP'))
-    : h('tr', null, h('td', null, h('b', null, p.name), ' ', h('small', null, p.pos || '')), ...lab.map((_, i) => h('td', null, p.stats[i] ?? '')));
+    ? h('tr', { class: 'muted' }, h('td', null, playerLink(p.id, p.name)), h('td', { colspan: lab.length, style: { textAlign: 'left' } }, p.reason || 'DNP'))
+    : h('tr', null, h('td', null, h('b', null, playerLink(p.id, p.name)), ' ', h('small', null, p.pos || '')), ...lab.map((_, i) => h('td', null, p.stats[i] ?? '')));
   const group = (name) => h('tr', { class: `grp ${name === 'Bench' ? 'bench' : ''}` }, h('td', { colspan: lab.length + 1 }, name));
   return h('div', { class: 'card scroll-x' }, h('table', { class: 'tbl' },
     h('thead', null, h('tr', null, h('th', null, 'Player'), lab.map((c) => h('th', null, c)))),

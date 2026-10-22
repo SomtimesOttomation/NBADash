@@ -295,3 +295,4 @@ td.best .cmp-val b { font-weight: 800; }
 td.best .cmp-val.on-bar b { color: #12240b; }
 .lead-badge { position: absolute; top: 8px; left: 10px; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line); padding: 1px 7px; border-radius: 999px; }
 .cmp-head .wins { color: var(--muted); font-size: 11px; }
+a.plink:hover { color: var(--accent2); }

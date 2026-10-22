@@ -39,7 +39,7 @@ function mkDay(key, state, offset) {
     const mkSide = (side, abbr) => {
       const q = st === 'pre' ? [] : [Math.round(20 + r() * 12), Math.round(20 + r() * 12), Math.round(20 + r() * 12), st === 'post' ? Math.round(20 + r() * 12) : 0].slice(0, st === 'in' ? 3 : 4);
       return { side, abbr, name: t(abbr).name, score: st === 'pre' ? '' : String(q.reduce((x, y) => x + y, 0)), winner: false, record: `${Math.floor(r() * 3)}-${Math.floor(r() * 3)}`, lines: q.map(String),
-        leaders: st === 'pre' ? [] : [{ cat: 'points', player: 'Player ' + abbr, value: String(15 + Math.floor(r() * 20)) }] };
+        leaders: st === 'pre' ? [] : [{ cat: 'points', player: 'Player ' + abbr, playerId: String((TEAMS.find((t) => t.abbr === abbr) || {}).id) + '0', value: String(15 + Math.floor(r() * 20)) }] };
     };
     const d = keyToUtcNoon(key); d.setUTCHours(23 + (i / 2) * 0.5, i % 4 ? 30 : 0);
     events.push({ id: `${key}${i}`, date: d.toISOString(), name: `${a} @ ${hm}`, state: st, detail: st === 'in' ? '3rd Quarter' : st === 'post' ? 'Final' : 'Scheduled',
