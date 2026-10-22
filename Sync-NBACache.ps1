@@ -360,7 +360,7 @@ for ($day = $start; $day -le $yday; $day = $day.AddDays(1)) {
                 lines = @($_.linescores | ForEach-Object { $_.displayValue })
                 leaders = @($_.leaders | ForEach-Object {
                     $l = $_.leaders | Select-Object -First 1
-                    [pscustomobject]@{ cat = $_.name; player = $l.athlete.displayName; value = $l.displayValue }
+                    [pscustomobject]@{ cat = $_.name; player = $l.athlete.displayName; playerId = [string]$l.athlete.id; value = $l.displayValue }
                 })
             }
         })

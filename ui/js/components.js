@@ -100,9 +100,14 @@ function leaderLine(ev) {
   const out = [];
   for (const sd of ev.sides) {
     const l = sd.leaders.find((x) => /point/i.test(x.cat));
-    if (l && l.player) out.push(`${sd.abbr === undefined ? '' : displayCode(sd.abbr)} ${lastName(l.player)} ${l.value}`);
+    if (l && l.player) out.push([`${sd.abbr === undefined ? '' : displayCode(sd.abbr)} `, playerLink(l.playerId, lastName(l.player)), ` ${l.value}`]);
   }
   return out;
+}
+// A player's name as a link to their page. Inside clickable cards it must not also trigger the card.
+export function playerLink(id, content, attrs = {}) {
+  if (!id) return h('span', attrs, content);
+  return h('a', { class: `plink ${attrs.class || ''}`.trim(), href: `#/player/${id}`, onclick: (e) => e.stopPropagation() }, content);
 }
 const lastName = (n) => String(n).split(' ').slice(-1)[0];
 
@@ -149,7 +154,7 @@ export function gameCard(ev, opts = {}) {
         isFavGame ? h('span', { class: 'fav-tag', title: 'Favorite team' }, '★') : null)),
     h('div', { class: 'sides' }, away ? sideRow(ev, away, opts) : null, home ? sideRow(ev, home, opts) : null),
     h('footer', { class: 'game-foot' },
-      leaders.length ? h('span', { class: 'leaders' }, leaders.join('   ')) :
+      leaders.length ? h('span', { class: 'leaders' }, leaders.map((x, i) => [i ? '   ' : '', x])) :
         h('span', { class: 'venue' }, [ev.venue].filter(Boolean).join('')),
       h('span', { class: 'go' }, ev.state === 'pre' ? 'Preview ›' : 'Box score ›')));
   return card;
@@ -214,7 +219,7 @@ export function leaderCardGrid(cards, { showTeam = false } = {}) {
     c.rows.length ? h('ol', null, c.rows.map((r, i) => h('li', { class: i === 0 ? 'first' : '' },
       h('span', { class: 'rk' }, i + 1),
       avatar(r.name, headshotUrl(r.id), i === 0 ? 44 : 32),
-      h('span', { class: 'nm' }, h('b', null, r.name), h('small', null, showTeam && r.team
+      h('span', { class: 'nm' }, h('b', null, playerLink(r.id, r.name)), h('small', null, showTeam && r.team
         ? h('span', { class: 'nm-team' }, teamLogo(r.team, 14), rowSub(r, true)) : rowSub(r, false))),
       h('span', { class: 'val' }, fmtValue(r.value, c)))))
       : h('p', { class: 'muted pad' }, 'Not enough data yet'))));
@@ -229,7 +234,7 @@ export function leaderRowSections(cards) {
     c.rows.length ? h('div', { class: 'pog-row' }, c.rows.map((r, i) => h('div', { class: `lcard ${i === 0 ? 'first' : ''}` },
       h('span', { class: 'pog-badge' }, i === 0 ? '\u2605 Leader' : ORD[i]),
       avatar(r.name, headshotUrl(r.id), 64),
-      h('b', { class: 'lcard-name' }, r.name),
+      h('b', { class: 'lcard-name' }, playerLink(r.id, r.name)),
       h('span', { class: 'pog-team' }, r.team ? teamLogo(r.team, 18) : null, r.team ? displayCode(r.team) : ''),
       h('span', { class: 'lcard-val' }, fmtValue(r.value, c)),
       h('small', { class: 'muted' }, r.sub))))
