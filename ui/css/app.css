@@ -290,3 +290,11 @@ body.has-cmpbar #app { padding-bottom: 70px; }
 #topbar { position: relative; z-index: 6; }
 .banner { z-index: 1; }
 .cmp-head b, .cmp-head .cmp-who b { text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--text); }
+
+/* compare: the overall leader's winning stats get a solid green cell; other winners keep a lighter green */
+td.best.lead { background: color-mix(in srgb, var(--good) 22%, transparent); box-shadow: inset 3px 0 0 var(--good); }
+td.best.lead .cmp-bar { background: color-mix(in srgb, var(--good) 45%, transparent); }
+td.best.lead .cmp-val b { color: var(--good); font-weight: 800; }
+th.cmp-head.leader { background: color-mix(in srgb, var(--good) 14%, var(--surface)); box-shadow: inset 0 3px 0 var(--good); }
+.lead-badge { position: absolute; top: 8px; left: 10px; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #fff; background: var(--good); padding: 2px 8px; border-radius: 999px; }
+.cmp-head .wins { color: var(--muted); font-size: 11px; }
