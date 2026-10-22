@@ -25,7 +25,7 @@ export const state = {
   teams: [],
   byAbbr: new Map(),
   byId: new Map(),
-  settings: { favorites: [], theme: 'system', liveSeconds: 30, autoWatch: true, updateCheck: true, autoHistory: true, ...TUNE_DEFAULTS },
+  settings: { favorites: [], theme: 'system', liveSeconds: 30, autoWatch: true, updateCheck: true, autoHistory: true, autoRefresh: false, ...TUNE_DEFAULTS },
   days: new Map(),          // 'yyyymmdd' -> { key, events, allFinal, source, at }
   cachedDayKeys: [],
   teamFiles: new Map(),     // abbr -> file | null
@@ -305,7 +305,7 @@ function onStandings(d) { state.standings = d; notify('standings'); }
 function onInjuries(d) { state.injuries = d; notify('injuries'); }
 
 function autoWatch() {
-  if (!state.settings.autoWatch) return;
+  if (!state.settings.autoRefresh || !state.settings.autoWatch) return;
   const fav = favSet();
   for (const e of allEvents()) {
     if (e.state === 'in' && e.sides.some((s) => fav.has(s.abbr)) && !state.watch.has(e.id)) setWatch(e.id, true);
@@ -315,7 +315,7 @@ function autoWatch() {
 // ---- actions -------------------------------------------------------------------------
 export async function setWatch(id, on) {
   id = String(id);
-  if (on) state.watch.add(id); else state.watch.delete(id);
+  if (on && state.settings.autoRefresh) state.watch.add(id); else state.watch.delete(id);   // manual mode: one fetch, no live polling
   notify('watch');
   try { await bridge.request('watch.set', { id, on }); } catch (e) { console.warn(e.message); }
 }
@@ -353,7 +353,7 @@ export function toggleFavorite(abbr) {
   const list = [...fav];
   // keep any team the person starred first at the front only visually; storage order is irrelevant
   saveSettings({ favorites: list });
-  if (!fav.has(abbr)) return;
+  if (!fav.has(abbr) || !state.settings.autoRefresh) return;
   // A newly starred team: ask the host to refresh it right away (favorites first).
   runSync('favorites');
 }
@@ -378,7 +378,7 @@ export async function refreshCachedDays() {
 // First run (or any run with gaps): quietly fetch one scoreboard per missing day since opening night.
 let historyTried = false;
 function autoHistory() {
-  if (historyTried || !state.host || state.sample || state.settings.autoHistory === false) return;
+  if (historyTried || !state.host || state.sample || !state.settings.autoRefresh || state.settings.autoHistory === false) return;
   historyTried = true;
   const have = new Set(state.cachedDayKeys);
   const last = yesterdayKey();

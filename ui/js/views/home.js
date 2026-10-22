@@ -28,7 +28,13 @@ function draw({ el }) {
       ? h('div', { class: 'grid' }, s.events.map((e) => gameCard(e)))
       : emptyState('No games', 'Nothing scheduled for this day.'));
   }
-  if (!sections.length) out.push(S.state.ready ? emptyState('Nothing cached yet', 'Run a sync (settings) or wait for live scores to load.') : skeletonCards(6));
+  if (!S.state.settings.autoRefresh && S.state.host) {
+    out.unshift(h('div', { class: 'card pad', style: { marginBottom: '18px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' } },
+      h('span', null, h('b', null, 'Automatic refresh is off. '), 'Scores only update when you ask. Use the ', h('b', null, '\u21bb'), ' button (or F5) for the latest scores, or '),
+      h('button', { class: 'btn', type: 'button', onclick: () => S.runSync('all') }, 'Run a full sync'),
+      h('button', { class: 'btn', type: 'button', onclick: () => import('./settings.js').then((m) => m.openSettings()) }, 'Automatic refresh options')));
+  }
+  if (!sections.length) out.push(S.state.ready ? emptyState('Nothing cached yet', S.state.settings.autoRefresh ? 'Run a sync (settings) or wait for live scores to load.' : 'Press the refresh button (top right) or run a full sync to download scores and teams.') : skeletonCards(6));
   el.replaceChildren(...out);
   void favGames;
 }

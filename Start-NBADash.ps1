@@ -47,18 +47,19 @@ $settingsDir = Split-Path $SettingsPath
 if (-not (Test-Path $settingsDir)) { New-Item -ItemType Directory -Path $settingsDir -Force | Out-Null }
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
-$script:Settings = [pscustomobject]@{ favorites = @(); theme = 'system'; liveSeconds = 30; autoWatch = $true; updateCheck = $true; autoHistory = $true }
+$script:Settings = [pscustomobject]@{ favorites = @(); theme = 'system'; liveSeconds = 30; autoWatch = $true; updateCheck = $true; autoHistory = $true; autoRefresh = $false }
 $script:TuneDefaults = [ordered]@{ idleMinutes = @(10, 1, 120); oldDayHours = @(6, 1, 48); tableLiveMinutes = @(15, 5, 120); tableStaleHours = @(6, 1, 48); teamFreshHours = @(20, 1, 168); tableFreshHours = @(4, 1, 48); backfillDays = @(7, 1, 30) }
 foreach ($k in $script:TuneDefaults.Keys) { $script:Settings | Add-Member -NotePropertyName $k -NotePropertyValue $script:TuneDefaults[$k][0] }
 if (Test-Path $SettingsPath) {
     try {
         $loaded = Get-Content $SettingsPath -Raw | ConvertFrom-Json
-        foreach ($k in (@('favorites', 'theme', 'liveSeconds', 'autoWatch', 'updateCheck', 'autoHistory') + @($script:TuneDefaults.Keys))) { if ($null -ne $loaded.$k) { $script:Settings.$k = $loaded.$k } }
+        foreach ($k in (@('favorites', 'theme', 'liveSeconds', 'autoWatch', 'updateCheck', 'autoHistory', 'autoRefresh') + @($script:TuneDefaults.Keys))) { if ($null -ne $loaded.$k) { $script:Settings.$k = $loaded.$k } }
     } catch { }
 }
 
 # ---------------------------------------------------------------- worker
 function Set-Tune {
+    $script:Shared.Auto = [bool]$script:Settings.autoRefresh
     $t = $script:Shared.Tune
     $t.IdleMinutes = [double]$script:Settings.idleMinutes; $t.OldDayHours = [double]$script:Settings.oldDayHours
     $t.TableLiveMinutes = [double]$script:Settings.tableLiveMinutes; $t.TableStaleHours = [double]$script:Settings.tableStaleHours
@@ -247,6 +248,7 @@ function Invoke-Command2 {
                 liveSeconds = [Math]::Max(10, [int]$s.liveSeconds); autoWatch = [bool]$s.autoWatch
                 updateCheck = $(if ($null -eq $s.updateCheck) { $true } else { [bool]$s.updateCheck })
                 autoHistory = $(if ($null -eq $s.autoHistory) { $true } else { [bool]$s.autoHistory })
+                autoRefresh = [bool]$s.autoRefresh
             }
             foreach ($k in $script:TuneDefaults.Keys) {
                 $d = $script:TuneDefaults[$k]; $v = $d[0]
@@ -261,7 +263,7 @@ function Invoke-Command2 {
         'watch.set' {
             $id = [string]$a.id
             if ($id -notmatch '^\d+$') { ReplyError $Msg.id 'bad id'; return }
-            if ($a.on) { $script:Shared.Watch[$id] = $true; $script:Shared.Commands.Enqueue(@{ type = 'box'; id = $id }) }
+            if ($a.on) { if ($script:Settings.autoRefresh) { $script:Shared.Watch[$id] = $true }; $script:Shared.Commands.Enqueue(@{ type = 'box'; id = $id }) }
             else { $script:Shared.Watch.Remove($id) }
             Reply $Msg.id 'true'
         }

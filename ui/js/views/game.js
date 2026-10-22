@@ -21,8 +21,9 @@ function draw({ el, arg }) {
   if (ev) out.push(gameCard(ev, { wide: true }));
   else if (box) out.push(h('div', { class: 'card pad' }, h('h2', null, box.name), h('small', null, [box.venue, box.city].filter(Boolean).join(', '))));
   if (ev?.state === 'in' && !S.state.watch.has(ev.id)) {
-    out.push(h('div', { class: 'card pad', style: { marginTop: '12px' } }, 'Live box score is off for this game. ',
-      h('button', { class: 'btn primary', type: 'button', onclick: () => S.setWatch(ev.id, true) }, 'Watch it')));
+    const auto = S.state.settings.autoRefresh;
+    out.push(h('div', { class: 'card pad', style: { marginTop: '12px' } }, auto ? 'Live box score is off for this game. ' : 'Automatic refresh is off. ',
+      h('button', { class: 'btn primary', type: 'button', onclick: () => S.setWatch(ev.id, true) }, auto ? 'Watch it' : 'Fetch the box score now')));
   }
   if (ev && ev.sides.some((s) => s.lines.length)) out.push(lineScore(ev));
   const pog = box ? pyramid(box) : null;

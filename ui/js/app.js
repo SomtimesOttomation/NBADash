@@ -81,7 +81,8 @@ function liveStatus() {
   const l = S.state.live;
   const anyLive = S.allEvents().some((e) => e.state === 'in');
   el.className = `live-status ${anyLive ? 'on' : ''} ${l.error ? 'err' : ''}`;
-  el.textContent = l.error ? 'Offline' : anyLive ? 'Live' : (l.at ? `Updated ${ago(l.at)}` : '');
+  const manual = !S.state.settings.autoRefresh;
+  el.textContent = l.error ? 'Offline' : manual ? (l.at ? `Manual \u00b7 updated ${ago(l.at)}` : 'Manual refresh') : anyLive ? 'Live' : (l.at ? `Updated ${ago(l.at)}` : '');
   el.title = l.error || '';
 }
 
@@ -117,6 +118,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'F5') { e.preventDef
 
 S.subscribe((topics) => {
   if (topics.has('theme') || topics.has('settings')) themeIcon();
+  if (topics.has('settings')) liveStatus();
   if (topics.has('teams') || topics.has('favorites')) renderBanner($('#banner'), location.hash.startsWith('#/team/') ? decodeURIComponent(location.hash.slice(7)) : '');
   if (topics.has('days')) renderWeekBar($('#weekbar'), location.hash.startsWith('#/week/') ? +location.hash.slice(7) : 0);
   if (topics.has('live') || topics.has('days')) liveStatus();

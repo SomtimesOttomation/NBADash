@@ -314,3 +314,6 @@ a.plink:hover { color: var(--accent2); }
 .tune-val { white-space: nowrap; color: var(--muted); font-size: 13px; }
 .tune-input { width: 68px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--text); font: inherit; text-align: right; }
 .modal { max-height: 90vh; overflow-y: auto; }
+
+.card.warn { border-color: #d9822b; background: color-mix(in srgb, #d9822b 8%, var(--surface)); margin: 8px 0; }
+.warn-text { color: #c26a14; }
