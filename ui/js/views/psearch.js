@@ -6,6 +6,7 @@ import { displayCode } from '../arenas.js';
 // Player search box in the top bar: searches the cached rosters instantly, and asks ESPN when that finds little.
 const RECENT_KEY = 'nbadash.recentPlayers';
 const recents = () => { try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || []; } catch { return []; } };
+const clearRecents = () => { try { localStorage.removeItem(RECENT_KEY); } catch { /* ignore */ } };
 const remember = (it) => {
   try { localStorage.setItem(RECENT_KEY, JSON.stringify([{ id: it.id, name: it.name, headshot: it.headshot, team: it.team, sub: it.sub }, ...recents().filter((r) => r.id !== it.id)].slice(0, 6))); } catch { /* ignore */ }
 };
@@ -65,7 +66,9 @@ export function initPlayerSearch() {
       const rec = recents();
       if (!rec.length || document.activeElement !== input) { close(); return; }
       items = rec; box.hidden = false;
-      box.replaceChildren(h('ul', { role: 'listbox' }, h('li', { class: 'ps-note' }, 'Recent'), items.map(rowFor)));
+      box.replaceChildren(h('ul', { role: 'listbox' }, h('li', { class: 'ps-note ps-recent-head' }, h('span', null, 'Recent'),
+        h('button', { class: 'ps-clear', type: 'button', title: 'Clear recent searches', onmousedown: (e) => e.preventDefault(), onclick: (e) => { e.stopPropagation(); clearRecents(); draw(); } }, 'Clear')),
+        items.map(rowFor)));
       return;
     }
     box.hidden = false;

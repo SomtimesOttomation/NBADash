@@ -317,3 +317,8 @@ a.plink:hover { color: var(--accent2); }
 
 .card.warn { border-color: #d9822b; background: color-mix(in srgb, #d9822b 8%, var(--surface)); margin: 8px 0; }
 .warn-text { color: #c26a14; }
+
+/* recent player searches: Clear button on the header row */
+.ps-recent-head { display: flex; justify-content: space-between; align-items: center; }
+.ps-clear { border: 0; background: none; color: var(--accent, #1d428a); font: inherit; font-size: 12px; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+.ps-clear:hover { background: var(--surface2); text-decoration: underline; }
