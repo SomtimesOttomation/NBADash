@@ -37,6 +37,10 @@ The home page shows today and last night. Everything earlier lives under the **W
 - Settings has **Fill in season history** (scoreboards only) and **Download full season history** (also every missing box score, about 8 KB per game). Both can be cancelled and pick up where they stopped.
 - Everything is fetched straight from ESPN to your own computer; nothing is shared or uploaded.
 
+## Refresh timing
+
+Settings has a **Refresh timing** section: live-score interval, idle scoreboard interval, how often finished days and standings/injuries are re-checked, and how fresh a sync treats saved team files, standings and injuries. Values are clamped to safe ranges, **Reset to defaults** restores them, and the nightly sync task reads the same values from your settings file.
+
 ## Updating
 The version number next to the settings button (for example `v0.2.0`) opens the update window. It checks the latest
 GitHub release of this repository, shows its release notes, downloads the update package, verifies its SHA-256 against the

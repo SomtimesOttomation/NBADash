@@ -33,10 +33,30 @@ export function openSettings() {
       h('hr', { style: { border: 0, borderTop: '1px solid var(--line)' } }),
       h('p', null, h('b', null, 'Data cache '), h('small', null, S.state.cacheDir || '(dev preview)')),
       syncPanel(),
+      h('hr', { style: { border: 0, borderTop: '1px solid var(--line)' } }),
+      timingPanel(),
       h('p', { style: { textAlign: 'right' } }, h('button', { class: 'btn primary', type: 'button', onclick: close }, 'Done')));
   });
 }
 void displayCode;
+
+// Adjustable refresh timing. Values are clamped to the allowed range and saved when the field loses focus.
+function timingPanel() {
+  const s = S.state.settings;
+  const rows = Object.entries(S.TUNING).map(([key, [def, min, max, label, unit, help]]) => {
+    const input = h('input', { type: 'number', min, max, step: 1, value: s[key] ?? def, class: 'tune-input', 'aria-label': label, 'data-key': key,
+      onchange: (e) => { let v = Math.round(Number(e.target.value)); if (!Number.isFinite(v)) v = def; v = Math.min(max, Math.max(min, v)); e.target.value = v; S.saveSettings({ [key]: v }); } });
+    return h('label', { class: 'tune-row', title: help }, h('span', null, label, h('small', null, help)), h('span', { class: 'tune-val' }, input, ' ', unit));
+  });
+  return h('div', null,
+    h('p', null, h('b', null, 'Refresh timing '), h('button', { class: 'btn', type: 'button', style: { marginLeft: '8px' }, onclick: () => {
+      S.saveSettings({ ...S.TUNE_DEFAULTS }); document.querySelectorAll('.tune-input').forEach((i) => { i.value = S.TUNE_DEFAULTS[i.dataset.key]; });
+    } }, 'Reset to defaults')),
+    h('p', null, h('label', null, h('input', { type: 'checkbox', checked: s.autoHistory !== false ? true : null, onchange: (e) => S.saveSettings({ autoHistory: e.target.checked }) }),
+      ' Fill in missing season days automatically at startup')),
+    h('div', { class: 'tune' }, rows),
+    h('small', null, 'Faster live refresh means more requests to ESPN; the defaults are polite. Live, idle and standings changes apply immediately; the sync values apply to the next sync, including the nightly task.'));
+}
 
 // Live status for the sync buttons: progress bar, current step, last result. Repaints on every 'sync' event.
 function syncPanel() {
