@@ -228,11 +228,11 @@ table.tbl { width: 100%; border-collapse: collapse; font-variant-numeric: tabula
 /* player search, player page, compare */
 .psearch { position: relative; margin-left: 14px; }
 .psearch { background: var(--surface); border-radius: 9px; }
-.psearch input { position: relative; width: 230px; padding: 7px 12px; border-radius: 9px; border: 1px solid var(--line); background: transparent; color: var(--text); font: inherit; }
+.psearch input { position: relative; width: 345px; padding: 7px 12px; border-radius: 9px; border: 1px solid var(--line); background: transparent; color: var(--text); font: inherit; }
 .psearch-ghost { position: absolute; inset: 0; padding: 8px 13px; font: inherit; color: var(--muted); opacity: .7; white-space: pre; overflow: hidden; pointer-events: none; line-height: normal; }
 .ps-name mark { background: none; color: var(--accent2); font-weight: 700; }
 .psearch input:focus { outline: 2px solid var(--accent2); outline-offset: 0; }
-.psearch-results { position: absolute; top: calc(100% + 6px); left: 0; width: 380px; max-height: 70vh; overflow: auto; z-index: 40; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+.psearch-results { position: absolute; top: calc(100% + 6px); left: 0; width: 420px; max-height: 70vh; overflow: auto; z-index: 40; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
 .psearch-results ul { list-style: none; margin: 0; padding: 6px; }
 .ps-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 9px; cursor: pointer; }
 .ps-row:hover, .ps-row.active { background: var(--surface2); }
@@ -261,7 +261,7 @@ table.bio td { text-align: left; white-space: normal; }
 .tile small { color: var(--muted); font-size: 11px; letter-spacing: .06em; }
 h3.sub { margin: 16px 0 6px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
 .view > section.card + section.card { margin-top: 16px; }
-@media (max-width: 900px) { .pl-top { grid-template-columns: 1fr; } .psearch input { width: 150px; } }
+@media (max-width: 900px) { .pl-top { grid-template-columns: 1fr; } .psearch input { width: 225px; } }
 
 .sect-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 table.cmp th, table.cmp td { text-align: center; vertical-align: middle; }
@@ -317,3 +317,8 @@ a.plink:hover { color: var(--accent2); }
 
 .card.warn { border-color: #d9822b; background: color-mix(in srgb, #d9822b 8%, var(--surface)); margin: 8px 0; }
 .warn-text { color: #c26a14; }
+
+/* recent player searches: Clear button on the header row */
+.ps-recent-head { display: flex; justify-content: space-between; align-items: center; }
+.ps-clear { border: 0; background: none; color: var(--accent, #1d428a); font: inherit; font-size: 12px; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+.ps-clear:hover { background: var(--surface2); text-decoration: underline; }
