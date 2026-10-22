@@ -85,7 +85,7 @@ function roster(file) {
     return h('tr', null,
       h('td', null, h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: '10px' } },
         avatar(p.name, p.headshot, 32),
-        h('b', null, p.name), ' ', i ? h('span', { class: `chip ${/out/i.test(i.status) ? 'out' : 'dtd'}`, title: i.comment || '' }, i.status) : null)),
+        h('a', { href: `#/player/${p.id}`, class: 'plink' }, h('b', null, p.name)), ' ', i ? h('span', { class: `chip ${/out/i.test(i.status) ? 'out' : 'dtd'}`, title: i.comment || '' }, i.status) : null)),
       h('td', null, p.jersey ? `#${p.jersey}` : ''), h('td', null, p.pos), h('td', null, p.height), h('td', null, p.weight), h('td', null, p.age ?? ''), h('td', null, p.years ?? ''),
       h('td', null, avg(p, 'pts')), h('td', null, avg(p, 'reb')), h('td', null, avg(p, 'ast')));
   };

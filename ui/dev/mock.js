@@ -58,6 +58,34 @@ function teamFile(abbr) {
   return { abbr, id: t.id, name: t.name, record: '1-1', espnArena: '', headCoach: 'Coach Example', players, games, syncedAt: new Date().toISOString() };
 }
 
+
+// ---- players (mock of the host's compacted ESPN player file)
+const AVG_LABELS = ['GP', 'GS', 'MIN', 'FG', 'FG%', '3PT', '3P%', 'FT', 'FT%', 'OR', 'DR', 'REB', 'AST', 'BLK', 'STL', 'PF', 'TO', 'PTS'];
+const TOT_LABELS = ['FG', 'FG%', '3PT', '3P%', 'FT', 'FT%', 'OR', 'DR', 'REB', 'AST', 'BLK', 'STL', 'PF', 'TO', 'PTS'];
+const MISC_LABELS = ['DD2', 'TD3', 'DQ', 'EJECT', 'TECH', 'FLAG', 'AST/TO', 'STL/TO', 'SC-EFF', 'SH-EFF'];
+function mockPlayer(id) {
+  const seed = [...String(id)].reduce((a, c) => a * 31 + c.charCodeAt(0), 7);
+  const r = (k, lo, hi) => lo + (((seed * (k + 3) * 2654435761) >>> 0) % 1000) / 1000 * (hi - lo);
+  let name = 'Michael Jordan', abbr = '', pos = 'SG', jersey = '23', retired = true;
+  for (const t of TEAMS) { const p = teamFile(t.abbr).players.find((x) => x.id === String(id)); if (p) { name = p.name; abbr = t.abbr; pos = p.pos; jersey = p.jersey; retired = false; } }
+  const team = TEAMS.find((t) => t.abbr === abbr);
+  const row = (year, played) => {
+    const gp = played ? Math.round(r(year, 8, 78)) : 0; const pts = r(year + 1, 6, 30), reb = r(year + 2, 2, 12), ast = r(year + 3, 1, 10);
+    const avg = [String(gp), String(Math.round(gp * 0.8)), r(year + 4, 18, 36).toFixed(1), `${(pts / 2.3).toFixed(1)}-${(pts / 1.1).toFixed(1)}`, r(year + 5, 40, 58).toFixed(1), '1.5-4.0', r(year + 6, 28, 42).toFixed(1), '3.0-3.8', r(year + 7, 70, 90).toFixed(1),
+      r(year + 8, 0.5, 3).toFixed(1), r(year + 9, 2, 8).toFixed(1), reb.toFixed(1), ast.toFixed(1), r(year + 10, 0.2, 1.6).toFixed(1), r(year + 11, 0.5, 1.8).toFixed(1), r(year + 12, 1.5, 3).toFixed(1), r(year + 13, 1, 4).toFixed(1), pts.toFixed(1)];
+    const tot = ['300-600', '48.0', '80-200', '35.0', '120-150', '80.0', '100', '300', '400', '350', '40', '60', '150', '120', String(Math.round(pts * gp))];
+    const misc = ['5', '0', '0', '0', '3', '0', '2.1', '0.8', '1.2', '0.55'];
+    return { year, season: `${year - 1}-${String(year).slice(2)}`, teamId: team ? String(team.id) : '', team: 'team', avg, tot, misc };
+  };
+  const played = (seed % 4) !== 0;                    // some mock players have no games yet this season
+  const seasons = [2024, 2025, 2026, 2027].map((y) => row(y, y < 2027 || played)).filter((s) => s.avg[0] !== '0');
+  return { syncedAt: new Date().toISOString(), season: 2027, seasonName: '2026-27',
+    bio: { id: String(id), name, jersey, pos, posName: { PG: 'Point Guard', SG: 'Shooting Guard', SF: 'Small Forward', PF: 'Power Forward', C: 'Center' }[pos] || pos, teamId: team ? String(team.id) : '', team: abbr, teamName: team ? team.name : '',
+      headshot: '', height: `6' ${Math.round(r(1, 3, 11))}"`, weight: `${Math.round(r(2, 190, 260))} lbs`, age: Math.round(r(3, 20, 35)), dob: '1998-04-12', birthPlace: 'Springfield, USA', draft: '2019: Rd 1, Pk 12 (TOR)', experience: '7th Season', college: retired ? 'North Carolina' : '', citizenship: '', status: retired ? 'Retired' : 'Active', debutYear: 2019 },
+    avgLabels: AVG_LABELS, totLabels: TOT_LABELS, miscLabels: MISC_LABELS, seasons,
+    career: { avg: row(2000, true).avg, tot: row(2000, true).tot, misc: row(2000, true).misc } };
+}
+
 function box(id) {
   const ev = Object.values(days).flatMap((d) => d.events).find((e) => e.id === id);
   if (!ev || ev.state === 'pre') return null;
@@ -154,6 +182,11 @@ export async function request(cmd, args) {
     }
     case 'update.cancel': return true;
     case 'update.apply': return true;
+    case 'player.get': return { player: mockPlayer(args.id) };
+    case 'player.search': {
+      setTimeout(() => emit('psearch', { q: args.q, ok: true, items: /jord/i.test(args.q) ? [{ id: '893', name: 'Michael Jordan', team: 'Chicago Bulls', jersey: '23', pos: 'SG', active: false, retired: true, headshot: '' }] : [] }), 500);
+      return true;
+    }
     case 'live.refresh': tick(); return true;
     case 'traffic.get': return { uptimeSec: (Date.now() - started) / 1000, ...stats, last: 'scoreboard' };
     default: throw new Error('mock: unknown ' + cmd);

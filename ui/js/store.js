@@ -27,6 +27,9 @@ export const state = {
   cachedBoxIds: new Set(),
   season: new Map(),        // abbr -> { agg, loaded, total, loading }
   league: { data: null, loading: false, n: 0, total: 0, rev: 0 },
+  players: new Map(),       // id -> { player, loading, error }
+  psearch: { q: '', items: [], loading: false },
+  compare: [],              // [{ id, name, headshot, team }]
   update: { phase: 'idle', info: null, pct: 0, text: '', error: '', quiet: false, note: null },
 };
 
@@ -145,9 +148,101 @@ function onSync(d) {
   const wasRunning = state.sync.running;
   state.sync = { ...state.sync, ...d };
   if (wasRunning && d.running === false) state.sync.finishedAt = Date.now();
-  if (d.running === false) { state.season.clear(); loadLeague(); refreshCachedBoxes(); refreshCachedDays(); loadStandings(true); loadInjuries(true); state.teamFiles.clear(); }
+  if (d.running === false) { state.season.clear(); loadLeague(); refreshCachedBoxes(); refreshCachedDays(); loadStandings(true); loadInjuries(true); state.teamFiles.clear(); playerIndex = null; }
   notify('sync');
 }
+
+// ---- players: local search index, player pages, compare list ----------------------------------
+let playerIndex = null;
+export const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+export async function buildPlayerIndex() {
+  if (playerIndex) return playerIndex;
+  const files = await Promise.all(state.teams.map((t) => loadTeamFile(t.abbr)));
+  const seen = new Set();
+  playerIndex = [];
+  files.forEach((f, i) => {
+    if (!f) return;
+    f.players.forEach((p) => {
+      const id = String(p.id);
+      if (seen.has(id)) return;
+      seen.add(id);
+      playerIndex.push({ id, name: p.name, abbr: state.teams[i].abbr, pos: p.pos || '', jersey: p.jersey || '', headshot: p.headshot || '', key: fold(p.name) });
+    });
+  });
+  return playerIndex;
+}
+
+// Every word typed must start some word of the name ("luka don" finds Luka Doncic). Names that start with the text come first.
+export function searchPlayers(q, limit = 8) {
+  const words = fold(q).split(' ').filter(Boolean);
+  if (!words.length || !playerIndex) return [];
+  const hits = [];
+  for (const p of playerIndex) {
+    const nameWords = p.key.split(' ');
+    if (!words.every((w) => nameWords.some((nw) => nw.startsWith(w)))) continue;
+    hits.push({ p, score: (p.key.startsWith(words[0]) ? 0 : 2) + (nameWords[nameWords.length - 1].startsWith(words[words.length - 1]) ? 0 : 1) });
+  }
+  return hits.sort((a, b) => a.score - b.score || a.p.name.localeCompare(b.p.name)).slice(0, limit).map((x) => x.p);
+}
+
+export function remoteSearch(q) {
+  state.psearch = { q, items: [], loading: true };
+  notify('psearch');
+  bridge.request('player.search', { q }).then((ok) => { if (!ok && state.psearch.q === q) { state.psearch.loading = false; notify('psearch'); } })
+    .catch(() => { if (state.psearch.q === q) { state.psearch.loading = false; notify('psearch'); } });
+}
+
+export async function loadPlayer(id, force) {
+  id = String(id);
+  const cur = state.players.get(id);
+  if (cur && cur.player && !force) return cur;
+  const entry = { player: cur?.player || null, loading: true, error: '' };
+  state.players.set(id, entry);
+  notify('player', `player:${id}`);
+  try {
+    const r = await bridge.request('player.get', { id });
+    if (r && r.player) entry.player = normPlayer(r.player);
+    entry.loading = !!(r && r.pending);          // pending: the host is fetching it, the 'player' event delivers it
+    if (!r) entry.error = 'No data for this player.';
+  } catch (e) { entry.loading = false; entry.error = e.message; }
+  notify('player', `player:${id}`);
+  return entry;
+}
+
+function normPlayer(p) {
+  p.seasons = asArray(p.seasons).map((r) => ({ ...r, avg: asArray(r.avg), tot: asArray(r.tot), misc: asArray(r.misc) }));
+  ['avgLabels', 'totLabels', 'miscLabels'].forEach((k) => { p[k] = asArray(p[k]); });
+  p.career = { avg: asArray(p.career?.avg), tot: asArray(p.career?.tot), misc: asArray(p.career?.misc) };
+  return p;
+}
+
+function onPlayer(d) {
+  const id = String(d.id);
+  if (d.error) state.players.set(id, { player: state.players.get(id)?.player || null, loading: false, error: d.error });
+  else state.players.set(id, { player: normPlayer(d.player), loading: false, error: '' });
+  notify('player', `player:${id}`);
+}
+function onPSearch(d) {
+  if (d.q !== state.psearch.q) return;
+  state.psearch = { q: d.q, items: asArray(d.items), loading: false };
+  notify('psearch');
+}
+
+// compare list (kept between launches in this browser profile; max 5 players)
+export const COMPARE_MAX = 5;
+function loadCompare() { try { return asArray(JSON.parse(localStorage.getItem('nbadash.compare'))).slice(0, COMPARE_MAX); } catch { return []; } }
+function saveCompare() { try { localStorage.setItem('nbadash.compare', JSON.stringify(state.compare)); } catch { /* ignore */ } }
+export const inCompare = (id) => state.compare.some((c) => c.id === String(id));
+export function toggleCompare(meta) {
+  const id = String(meta.id);
+  if (inCompare(id)) state.compare = state.compare.filter((c) => c.id !== id);
+  else if (state.compare.length < COMPARE_MAX) state.compare = [...state.compare, { id, name: meta.name, headshot: meta.headshot || '', team: meta.team || '' }];
+  else return false;
+  saveCompare(); notify('compare');
+  return true;
+}
+export function clearCompare() { state.compare = []; saveCompare(); notify('compare'); }
 
 // ---- app updates (the host runs the GitHub check / download in a child process and reports back) ----------
 function onUpdate(d) {
@@ -399,6 +494,9 @@ export async function init() {
   bridge.on('live', onLive);
   bridge.on('sync', onSync);
   bridge.on('update', onUpdate);
+  bridge.on('player', onPlayer);
+  bridge.on('psearch', onPSearch);
+  state.compare = loadCompare();
   bridge.on('standings', (d) => { d.conferences = asArray(d.conferences).map((c) => ({ ...c, teams: asArray(c.teams) })); onStandings(d); });
   bridge.on('injuries', (d) => { d.teams = asArray(d.teams).map((t) => ({ ...t, players: asArray(t.players) })); onInjuries(d); });
 

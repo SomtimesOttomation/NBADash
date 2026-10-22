@@ -18,6 +18,17 @@ a nightly cache sync, and a secret traffic counter (click the "NBA 2026-27" titl
 - `Update-NBADash.ps1` / `Apply-Update.ps1` update check, verified download, and the install-and-roll-back helper.
 - `ui\` the web UI. Open `ui\index.html` through any static server for a mock-data preview in a normal browser.
 
+## Player search and comparison
+Type in the search box next to League Leaders (press `/` to jump to it). Suggestions appear as you type: Tab or the
+right arrow completes the top name, Enter opens it, and the box offers your recent players when it is empty. Names come
+from the cached rosters; if nothing matches there, ESPN's player search is asked (this also finds retired players).
+
+- A player page shows the photo, a bio table (height, weight, age, birth date and place, draft, experience), this
+  season's per-game stats and totals, and a season-by-season history. Stats and bios come from ESPN and are cached for
+  3 hours in `%LOCALAPPDATA%\NBADash\cache\players`. A player with no games yet this season shows that plainly.
+- Use **+ Compare** in the results or **Add to comparison** on a player page (up to 5 players). The tray at the bottom
+  opens a side-by-side table for this season, last season or career, with the best number in each row highlighted.
+
 ## Updating
 The version number next to the settings button (for example `v0.2.0`) opens the update window. It checks the latest
 GitHub release of this repository, shows its release notes, downloads the update package, verifies its SHA-256 against the

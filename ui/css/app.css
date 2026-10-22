@@ -224,3 +224,69 @@ table.tbl { width: 100%; border-collapse: collapse; font-variant-numeric: tabula
 .upd-li::before { content: "\2022"; position: absolute; left: 3px; }
 .upd-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
 .upd-err { color: var(--warn); }
+
+/* player search, player page, compare */
+.psearch { position: relative; margin-left: 14px; }
+.psearch { background: var(--surface); border-radius: 9px; }
+.psearch input { position: relative; width: 230px; padding: 7px 12px; border-radius: 9px; border: 1px solid var(--line); background: transparent; color: var(--text); font: inherit; }
+.psearch-ghost { position: absolute; inset: 0; padding: 8px 13px; font: inherit; color: var(--muted); opacity: .7; white-space: pre; overflow: hidden; pointer-events: none; line-height: normal; }
+.ps-name mark { background: none; color: var(--accent2); font-weight: 700; }
+.psearch input:focus { outline: 2px solid var(--accent2); outline-offset: 0; }
+.psearch-results { position: absolute; top: calc(100% + 6px); left: 0; width: 380px; max-height: 70vh; overflow: auto; z-index: 40; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+.psearch-results ul { list-style: none; margin: 0; padding: 6px; }
+.ps-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 9px; cursor: pointer; }
+.ps-row:hover, .ps-row.active { background: var(--surface2); }
+.ps-name { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.ps-name b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-name small, .ps-empty, .ps-note { color: var(--muted); font-size: 12px; }
+.ps-empty, .ps-note { padding: 8px 10px; }
+.ps-add { font-size: 12px; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--text); white-space: nowrap; }
+.ps-add:hover { background: var(--surface2); }
+.ps-add.on { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+a.plink { color: inherit; text-decoration: none; }
+a.plink:hover { text-decoration: underline; }
+.inline-team { display: inline-flex; align-items: center; gap: 6px; color: inherit; text-decoration: none; }
+a.inline-team:hover { text-decoration: underline; }
+
+.pl-top { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 24px; padding: 20px; margin-bottom: 16px; align-items: start; }
+.pl-left h1 { font-size: 26px; margin-top: 12px; }
+.pl-left .meta { color: var(--muted); }
+.pl-photo { display: grid; place-items: end center; height: 250px; border-radius: 12px; overflow: hidden; background: linear-gradient(160deg, color-mix(in srgb, var(--tc) 55%, var(--surface)), var(--surface2)); }
+.pl-photo img { height: 100%; width: auto; max-width: 100%; object-fit: contain; object-position: bottom; }
+table.bio th { width: 130px; text-align: left; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; position: static; background: none; }
+table.bio td { text-align: left; white-space: normal; }
+.stat-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 10px; margin: 12px 0 6px; }
+.tile { background: var(--surface2); border-radius: 12px; padding: 12px 10px; text-align: center; }
+.tile b { display: block; font-size: 24px; font-variant-numeric: tabular-nums; }
+.tile small { color: var(--muted); font-size: 11px; letter-spacing: .06em; }
+h3.sub { margin: 16px 0 6px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+section.card + section.card { margin-top: 16px; }
+@media (max-width: 900px) { .pl-top { grid-template-columns: 1fr; } .psearch input { width: 150px; } }
+
+.sect-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+table.cmp th, table.cmp td { text-align: center; vertical-align: middle; }
+table.cmp tbody th { text-align: left; font-weight: 500; position: static; background: none; text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--text); }
+table.cmp thead th { padding: 14px 10px; min-width: 150px; }
+table.cmp thead th:first-child { min-width: 170px; }
+.cmp-head { position: relative; }
+.cmp-who { display: flex; flex-direction: column; align-items: center; gap: 6px; color: inherit; text-decoration: none; }
+.cmp-who:hover b { text-decoration: underline; }
+.cmp-head small { display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 4px; text-transform: none; letter-spacing: 0; }
+.cmp-x { position: absolute; top: 6px; right: 8px; border: 0; background: none; color: var(--muted); font-size: 18px; line-height: 1; }
+.cmp-x:hover { color: var(--text); }
+table.cmp tr.grp.sub td { background: none; border-bottom: 1px solid var(--line); color: var(--muted); }
+.cmp-val { position: relative; display: block; padding: 2px 8px; }
+.cmp-val b { position: relative; font-weight: 600; }
+.cmp-bar { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; background: color-mix(in srgb, var(--accent2) 16%, transparent); }
+td.best .cmp-bar { background: color-mix(in srgb, var(--good) 32%, transparent); }
+td.best .cmp-val b { color: var(--good); }
+.cmpbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -4px 16px rgba(0,0,0,.18); }
+.cmpbar-in { display: flex; align-items: center; gap: 12px; padding: 10px 20px; max-width: 1400px; margin: 0 auto; }
+.cmpbar-chips { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
+.cmp-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 6px 3px 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface2); }
+.cmp-chip a { color: inherit; text-decoration: none; font-size: 13px; }
+.cmp-chip button { border: 0; background: none; color: var(--muted); font-size: 16px; line-height: 1; }
+body.has-cmpbar #app { padding-bottom: 70px; }
+#topbar { position: relative; z-index: 6; }
+.banner { z-index: 1; }
+.cmp-head b, .cmp-head .cmp-who b { text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--text); }
