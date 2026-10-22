@@ -32,3 +32,6 @@ Cache `%LOCALAPPDATA%\NBADash\cache`, settings `%APPDATA%\NBADash\settings.json`
 - `modules\` PowerShell module for live ESPN polling.
 - `ui\` the web UI (vanilla ES modules). `ui\dev\mock.js` is the mock host used for browser previews.
 - `tools\` the feed probe scripts used to check what ESPN returns.
+
+## License
+MIT. See `LICENSE`. Data comes from ESPN's public endpoints; team names and logos belong to their owners.
