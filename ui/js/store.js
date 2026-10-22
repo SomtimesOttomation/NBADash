@@ -1,6 +1,6 @@
 // App state, cache access and live-event handling. Views subscribe to topics and re-render.
 import * as bridge from './bridge.js';
-import { etKey, addDaysKey, asArray } from './util.js';
+import { etKey, addDaysKey, asArray, fmtKey } from './util.js';
 import { toEspnCode } from './arenas.js';
 import { aggregate, newLeague, leagueAdd, LEAGUE_VERSION } from './stats.js';
 
@@ -33,6 +33,14 @@ export const state = {
   update: { phase: 'idle', info: null, pct: 0, text: '', error: '', quiet: false, note: null },
 };
 
+// ---- season weeks: ESPN's "Week 1" is Oct 20-26, 2026 (opening night is a Tuesday); each week runs 7 days from there
+export const SEASON_START = '20261020';
+const keyToUtc = (k) => Date.UTC(+k.slice(0, 4), +k.slice(4, 6) - 1, +k.slice(6, 8));
+export const weekOfKey = (k) => Math.floor((keyToUtc(k) - keyToUtc(SEASON_START)) / 86400000 / 7) + 1;
+export const weekDayKeys = (n) => Array.from({ length: 7 }, (_, i) => addDaysKey(SEASON_START, (n - 1) * 7 + i));
+export const weekRangeLabel = (n) => { const d = weekDayKeys(n); const f = (k) => fmtKey(k, { weekday: undefined }); return `${f(d[0])} - ${f(d[6])}`; };
+// weeks that have at least one saved day, ascending; the link only appears once there is data
+export const weeksWithData = () => [...new Set(state.cachedDayKeys.filter((k) => k >= SEASON_START).map(weekOfKey))].sort((a, b) => a - b);
 export const todayKey = () => etKey(new Date());
 export const yesterdayKey = () => addDaysKey(todayKey(), -1);
 
@@ -355,6 +363,18 @@ export async function refreshCachedDays() {
   } catch (e) { /* ignore */ }
 }
 
+// First run (or any run with gaps): quietly fetch one scoreboard per missing day since opening night.
+let historyTried = false;
+function autoHistory() {
+  if (historyTried || !state.host || state.sample || state.settings.autoHistory === false) return;
+  historyTried = true;
+  const have = new Set(state.cachedDayKeys);
+  const last = yesterdayKey();
+  for (let k = SEASON_START; k <= last; k = addDaysKey(k, 1)) {
+    if (!have.has(k)) { setTimeout(() => { if (!state.sync.running) runSync('history'); }, 6000); return; }
+  }
+}
+
 export async function loadTeamFile(abbr) {
   if (state.teamFiles.has(abbr)) return state.teamFiles.get(abbr);
   const f = await readCache(`teams/${abbr}.json`);
@@ -509,7 +529,7 @@ export async function init() {
 
   loadDay(yesterdayKey());
   loadDay(todayKey());
-  refreshCachedDays();
+  refreshCachedDays().then(autoHistory);
   loadStandings();
   loadInjuries();
   if (state.host && state.settings.updateCheck !== false && !state.update.note) setTimeout(() => checkUpdate({ quiet: true }), 4000);

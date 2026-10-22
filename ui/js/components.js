@@ -161,6 +161,14 @@ export function gameCard(ev, opts = {}) {
 }
 
 // ---- banner ------------------------------------------------------------------------------------------------
+// "Week 1 | Week 2 | ..." under the team banner; only weeks that have saved games are linked.
+export function renderWeekBar(el, activeWeek) {
+  const weeks = S.weeksWithData();
+  el.hidden = weeks.length === 0;
+  el.replaceChildren(h('span', { class: 'weekbar-label' }, 'Season'),
+    ...weeks.map((n) => h('a', { class: `weeklink ${n === activeWeek ? 'active' : ''}`, href: `#/week/${n}`, title: S.weekRangeLabel(n) }, `Week ${n}`)));
+}
+
 export function renderBanner(el, activeAbbr) {
   const { favorites, others } = S.orderedTeams();
   el.replaceChildren();

@@ -35,6 +35,10 @@ param(
     [int]$Season          = 2027,    # ESPN names 2026-27 by its ending year
     [switch]$Force,
     [switch]$Quick,                  # favorites only, 2-day window, at most 3 box scores
+    [switch]$FullSeason,             # go back to opening night instead of the 7-day window (finished days are skipped, so it can resume)
+    [switch]$NoBoxes,                # scoreboards only: do not download box scores
+    [switch]$HistoryOnly,            # skip rosters, standings and injuries (use with -FullSeason)
+    [string]$EspnBase = 'https://site.api.espn.com',    # only changed by tests
     [switch]$KeepRaw                 # also keep the raw ESPN JSON under cache\raw (for checking field names)
 )
 
@@ -56,7 +60,7 @@ foreach ($sub in '', 'logos', 'teams', 'scoreboards', 'boxscores', 'logs', 'raw'
     if (-not (Test-Path $p)) { New-Item -ItemType Directory -Path $p -Force | Out-Null }
 }
 $UA     = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) NBADash-Sync/0.1'
-$espn   = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba'
+$espn   = "$EspnBase/apis/site/v2/sports/basketball/nba"
 $utf8   = New-Object System.Text.UTF8Encoding($false)
 $runId  = (Get-Date).ToString('yyyyMMdd-HHmmss')
 $logFile = Join-Path $CacheDir ("logs\sync-" + (Get-Date).ToString('yyyyMMdd') + '.log')
@@ -197,8 +201,9 @@ if ($state -and $state.lastCompleteDate) {
 } else { $start = $windowStart }
 if ($start -lt $seasonStart) { $start = $seasonStart }
 if ($Force) { $start = $windowStart; if ($start -lt $seasonStart) { $start = $seasonStart } }
+if ($FullSeason) { $start = $seasonStart }
 
-Write-Log ("=== Sync {0}  favorites: {1}  days: {2:yyyy-MM-dd} to {3:yyyy-MM-dd}  quick={4} force={5}" -f $runId, ($favAbbr -join ','), $start, $yday, [bool]$Quick, [bool]$Force)
+Write-Log ("=== Sync {0}  favorites: {1}  days: {2:yyyy-MM-dd} to {3:yyyy-MM-dd}  quick={4} force={5} fullSeason={6} noBoxes={7}" -f $runId, ($favAbbr -join ','), $start, $yday, [bool]$Quick, [bool]$Force, [bool]$FullSeason, [bool]$NoBoxes)
 
 # ---------------------------------------------------------------- 1. teams + logos
 Set-Progress 2 'Contacting ESPN'
@@ -223,6 +228,7 @@ foreach ($tm in $teamList) {
 # ---------------------------------------------------------------- 2. teams: roster, coach, schedule
 $ordered = @($teamList | Sort-Object @{ Expression = { if ($favAbbr -contains $_.abbr) { 0 } else { 1 } } }, name)
 if ($Quick) { $ordered = @($ordered | Where-Object { $favAbbr -contains $_.abbr }) }
+if ($HistoryOnly) { $ordered = @() }
 
 $ti = 0
 foreach ($tm in $ordered) {
@@ -277,10 +283,10 @@ foreach ($tm in $ordered) {
 
 # ---------------------------------------------------------------- 3. standings
 $stPath = Join-Path $CacheDir 'standings.json'
-if (-not (Test-Fresh $stPath 4)) {
+if (-not $HistoryOnly -and -not (Test-Fresh $stPath 4)) {
     Write-Log 'Standings'
     Set-Progress 72 'Standings'
-    $st = Get-Json 'https://site.api.espn.com/apis/v2/sports/basketball/nba/standings' 'standings' 'standings'
+    $st = Get-Json "$EspnBase/apis/v2/sports/basketball/nba/standings" 'standings' 'standings'
     if ($st) {
         $conf = @($st.children | ForEach-Object {
             $cname = $_.name
@@ -299,7 +305,7 @@ if (-not (Test-Fresh $stPath 4)) {
 
 # ---------------------------------------------------------------- 4. injuries
 $injPath = Join-Path $CacheDir 'injuries.json'
-if (-not (Test-Fresh $injPath 4)) {
+if (-not $HistoryOnly -and -not (Test-Fresh $injPath 4)) {
     Write-Log 'Injuries'
     Set-Progress 76 'Injuries'
     $inj = Get-Json "$espn/injuries" 'injuries' 'injuries'
@@ -317,6 +323,46 @@ if (-not (Test-Fresh $injPath 4)) {
         })
         Save-Json $injPath ([pscustomobject]@{ syncedAt = (Get-Date).ToString('s'); teams = $teamsInj })
     }
+}
+
+function Save-BoxScore {
+    # Downloads one finished game's summary and writes the compact box score. Returns $true when a file was saved.
+    param([string]$Id, [string]$Date, [string]$Name)
+    $bxPath = Join-Path $CacheDir ("boxscores\" + $Id + '.json')
+    $sum = Get-Json "$($EspnBase -replace 'site\.api', 'site.web.api')/apis/site/v2/sports/basketball/nba/summary?region=us&lang=en&contentorigin=espn&event=$Id" 'boxscore' ("summary-" + $Id)
+    if (-not $sum -or -not $sum.boxscore) {
+        $sum = Get-Json "$espn/summary?event=$Id" 'boxscore' ("summary-alt-" + $Id)
+    }
+    if (-not $sum -or -not $sum.boxscore) { return $false }
+    $boxTeams = @($sum.boxscore.players | ForEach-Object {
+        $grp = $_.statistics | Select-Object -First 1
+        [pscustomobject]@{
+            team = $_.team.abbreviation
+            labels = @($grp.labels)
+            players = @($grp.athletes | ForEach-Object {
+                [pscustomobject]@{
+                    id = $_.athlete.id; name = $_.athlete.displayName; jersey = $_.athlete.jersey
+                    pos = $_.athlete.position.abbreviation; starter = $_.starter
+                    dnp = $_.didNotPlay; reason = $_.reason; stats = @($_.stats)
+                }
+            })
+            totals = @($grp.totals)
+        }
+    })
+    $teamStats = @($sum.boxscore.teams | ForEach-Object {
+        [pscustomobject]@{
+            team = $_.team.abbreviation
+            stats = @($_.statistics | ForEach-Object { [pscustomobject]@{ name = $_.name; value = $_.displayValue } })
+        }
+    })
+    Save-Json $bxPath ([pscustomobject]@{
+        id = $Id; date = $Date; name = $Name
+        venue = $sum.gameInfo.venue.fullName; city = $sum.gameInfo.venue.address.city
+        attendance = $sum.gameInfo.attendance
+        teams = $boxTeams; teamStats = $teamStats
+        syncedAt = (Get-Date).ToString('s')
+    })
+    return $true
 }
 
 # ---------------------------------------------------------------- 5. finished days: scoreboards + box scores
@@ -337,6 +383,14 @@ for ($day = $start; $day -le $yday; $day = $day.AddDays(1)) {
     if ((-not $Force) -and (Test-Path $sbPath)) { try { $cached = Get-Content $sbPath -Raw | ConvertFrom-Json } catch { } }
 
     if ($cached -and $cached.allFinal) {
+        if (-not $NoBoxes) {
+            foreach ($cev in @($cached.events | Where-Object { $_.state -eq 'post' })) {
+                if ($boxMax -gt 0 -and $boxCount -ge $boxMax) { break }
+                if (Test-Path (Join-Path $CacheDir ("boxscores\" + $cev.id + '.json'))) { continue }
+                Set-Progress ($dayPct + 10 / $totalDays) ('Box score ' + $cev.name)
+                if (Save-BoxScore -Id ([string]$cev.id) -Date ([string]$cev.date) -Name ([string]$cev.name)) { $boxCount++; Write-Log ("  box score {0}: {1}" -f $cev.id, $cev.name) }
+            }
+        }
         Write-Log "Day ${ds}: already complete"
         if (-not $blocked) { $lastComplete = $ds }
         continue
@@ -376,43 +430,12 @@ for ($day = $start; $day -le $yday; $day = $day.AddDays(1)) {
 
     # box scores for finished games
     foreach ($ev in ($events | Where-Object { $_.status.type.state -eq 'post' })) {
+        if ($NoBoxes) { break }
         if ($boxMax -gt 0 -and $boxCount -ge $boxMax) { break }
         $bxPath = Join-Path $CacheDir ("boxscores\" + $ev.id + '.json')
         if ((-not $Force) -and (Test-Path $bxPath)) { continue }
         Set-Progress ($dayPct + 10 / $totalDays) ('Box score ' + $ev.shortName)
-        $sum = Get-Json "https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba/summary?region=us&lang=en&contentorigin=espn&event=$($ev.id)" 'boxscore' ("summary-" + $ev.id)
-        if (-not $sum -or -not $sum.boxscore) {
-            $sum = Get-Json "$espn/summary?event=$($ev.id)" 'boxscore' ("summary-alt-" + $ev.id)
-        }
-        if (-not $sum -or -not $sum.boxscore) { continue }
-        $boxTeams = @($sum.boxscore.players | ForEach-Object {
-            $grp = $_.statistics | Select-Object -First 1
-            [pscustomobject]@{
-                team = $_.team.abbreviation
-                labels = @($grp.labels)
-                players = @($grp.athletes | ForEach-Object {
-                    [pscustomobject]@{
-                        id = $_.athlete.id; name = $_.athlete.displayName; jersey = $_.athlete.jersey
-                        pos = $_.athlete.position.abbreviation; starter = $_.starter
-                        dnp = $_.didNotPlay; reason = $_.reason; stats = @($_.stats)
-                    }
-                })
-                totals = @($grp.totals)
-            }
-        })
-        $teamStats = @($sum.boxscore.teams | ForEach-Object {
-            [pscustomobject]@{
-                team = $_.team.abbreviation
-                stats = @($_.statistics | ForEach-Object { [pscustomobject]@{ name = $_.name; value = $_.displayValue } })
-            }
-        })
-        Save-Json $bxPath ([pscustomobject]@{
-            id = $ev.id; date = $ev.date; name = $ev.shortName
-            venue = $sum.gameInfo.venue.fullName; city = $sum.gameInfo.venue.address.city
-            attendance = $sum.gameInfo.attendance
-            teams = $boxTeams; teamStats = $teamStats
-            syncedAt = (Get-Date).ToString('s')
-        })
+        if (-not (Save-BoxScore -Id $ev.id -Date $ev.date -Name $ev.shortName)) { continue }
         $boxCount++
         Write-Log ("  box score {0}: {1}" -f $ev.id, $ev.shortName)
     }

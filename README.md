@@ -29,6 +29,14 @@ from the cached rosters; if nothing matches there, ESPN's player search is asked
 - Use **+ Compare** in the results or **Add to comparison** on a player page (up to 5 players). The tray at the bottom
   opens a side-by-side table for this season, last season or career, with the best number in each row highlighted.
 
+## Season history and weeks
+
+The home page shows today and last night. Everything earlier lives under the **Week** links below the team banner (Week 1 = Oct 20-26, 2026, and so on). A week link only appears once games for it are saved on your computer.
+
+- The first time you open the app (and whenever days are missing) it quietly downloads one scoreboard per day since opening night, politely, a few requests per second at most.
+- Settings has **Fill in season history** (scoreboards only) and **Download full season history** (also every missing box score, about 8 KB per game). Both can be cancelled and pick up where they stopped.
+- Everything is fetched straight from ESPN to your own computer; nothing is shared or uploaded.
+
 ## Updating
 The version number next to the settings button (for example `v0.2.0`) opens the update window. It checks the latest
 GitHub release of this repository, shows its release notes, downloads the update package, verifies its SHA-256 against the
