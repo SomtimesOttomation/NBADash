@@ -12,6 +12,14 @@ const pick = (stats, key) => {
   return k ? stats[k] : '';
 };
 
+// Win percentage first. Teams on the same percentage (everyone 1-0 on opening week) rank by games above .500, so 2-0 is ahead of 1-0
+// and 0-0 is ahead of 0-1, which is the same order as games behind. Anything still level keeps ESPN's own order.
+export function sortStandings(teams) {
+  const n = (st, k) => { const v = parseFloat(pick(st, k)); return Number.isFinite(v) ? v : 0; };
+  return teams.map((t, i) => ({ t, i, pct: n(t.stats, 'winPercent'), diff: n(t.stats, 'wins') - n(t.stats, 'losses'), w: n(t.stats, 'wins') }))
+    .sort((a, b) => (b.pct - a.pct) || (b.diff - a.diff) || (b.w - a.w) || (a.i - b.i)).map((x) => x.t);
+}
+
 function draw({ el }) {
   const st = S.state.standings;
   if (!st) { el.replaceChildren(emptyState('Standings not cached yet', 'They arrive with the next sync.')); return; }
@@ -19,7 +27,7 @@ function draw({ el }) {
   const out = [h('div', { class: 'section-head' }, h('h2', null, 'Standings', h('small', null, `Updated ${ago(Date.parse(st.syncedAt))}`)))];
   const wrap = h('div', { class: 'two' });
   for (const c of st.conferences) {
-    const teams = [...c.teams].sort((a, b) => parseFloat(pick(b.stats, 'winPercent')) - parseFloat(pick(a.stats, 'winPercent')));
+    const teams = sortStandings(c.teams);
     wrap.append(h('div', null, sectionHead(c.name),
       h('div', { class: 'card scroll-x' }, h('table', { class: 'tbl' },
         h('thead', null, h('tr', null, h('th', null, 'Team'), COLS.map(([l]) => h('th', null, l)))),
