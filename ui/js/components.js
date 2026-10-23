@@ -247,22 +247,22 @@ export function leaderCardGrid(cards, { showTeam = false } = {}) {
       avatar(r.name, headshotUrl(r.id), i === 0 ? 44 : 32),
       h('span', { class: 'nm' }, h('b', null, playerLink(r.id, r.name)), h('small', null, showTeam && r.team
         ? h('span', { class: 'nm-team' }, teamLogo(r.team, 14), rowSub(r, true)) : rowSub(r, false))),
-      h('span', { class: 'val' }, fmtValue(r.value, c)))))
+      h('span', { class: 'val' }, r.text || fmtValue(r.value, c)))))
       : h('p', { class: 'muted pad' }, 'Not enough data yet'))));
 }
 
 const ORD = ['Leader', '2nd', '3rd', '4th', '5th'];
 
 // Row view: each category is a heading followed by one centred row of player cards (1st to 5th).
-export function leaderRowSections(cards) {
+export function leaderRowSections(cards, { worst = false } = {}) {
   return h('div', { class: 'lrows' }, cards.map((c) => h('section', { class: 'lrow' },
     h('div', { class: 'section-head' }, h('h2', null, c.title, h('small', null, c.unit))),
     c.rows.length ? h('div', { class: 'pog-row' }, c.rows.map((r, i) => h('div', { class: `lcard ${i === 0 ? 'first' : ''}` },
-      h('span', { class: 'pog-badge' }, i === 0 ? '\u2605 Leader' : ORD[i]),
+      h('span', { class: 'pog-badge' }, i === 0 ? (worst ? '\u25be Worst' : '\u2605 Leader') : ORD[i]),
       avatar(r.name, headshotUrl(r.id), 64),
       h('b', { class: 'lcard-name' }, playerLink(r.id, r.name)),
       h('span', { class: 'pog-team' }, r.team ? teamLogo(r.team, 18) : null, r.team ? displayCode(r.team) : ''),
-      h('span', { class: 'lcard-val' }, fmtValue(r.value, c)),
+      h('span', { class: 'lcard-val' }, r.text || fmtValue(r.value, c)),
       h('small', { class: 'muted' }, r.sub))))
       : h('p', { class: 'muted', style: { textAlign: 'center' } }, 'Not enough data yet'))));
 }
