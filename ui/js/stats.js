@@ -167,7 +167,7 @@ export function rankAll(players, ctxFor, top, { minMpg = 8, minGpShare = 0, wors
       })
       .map((p) => ({ p, value: d.v(p, ctxFor(p)) }))
       .filter((r) => Number.isFinite(r.value))
-      .sort((a, b) => ((d.low !== worst) ? a.value - b.value : b.value - a.value) || b.p.tot.min - a.p.tot.min)   // ties: the player with more minutes ranks first
+      .sort((a, b) => ((!!d.low !== worst) ? a.value - b.value : b.value - a.value) || b.p.tot.min - a.p.tot.min)   // ties: the player with more minutes ranks first
       .slice(0, top)
       .map((r) => ({ id: r.p.id, name: r.p.name, team: r.p.team, jersey: r.p.jersey, value: r.value, text: d.text ? d.text(r.p) : '', sub: d.sub ? d.sub(r.p) : `${r.p.gp} GP` }));
     return { key: d.key, title: worst ? d.loser : d.title, unit: d.unit, f: d.f, suffix: d.suffix || '', signed: !!d.signed, note: d.note || '', rows };
