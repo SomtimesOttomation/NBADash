@@ -11,7 +11,7 @@ export function mount(ctx) {
 export function update(topics, ctx) { if (['days', 'favorites', 'watch', 'teams', 'box'].some((t) => topics.has(t))) draw(ctx); }
 
 function draw({ el }) {
-  const keys = S.weekDayKeys(week).filter((k) => S.state.cachedDayKeys.includes(k) || S.state.days.has(k));
+  const keys = S.weekDayKeys(week).slice().reverse().filter((k) => S.state.cachedDayKeys.includes(k) || S.state.days.has(k));
   const out = [sectionHead(`Week ${week}`, S.weekRangeLabel(week))];
   let games = 0;
   for (const k of keys) {

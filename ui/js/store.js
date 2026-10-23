@@ -284,7 +284,13 @@ export async function checkUpdate({ quiet = false } = {}) {
   if (u.phase === 'checking' || u.phase === 'downloading') return;
   u.quiet = quiet; u.phase = 'checking'; u.error = ''; u.pct = 0; u.text = 'Asking GitHub for the latest release...';
   notify('update');
-  try { await bridge.request('update.check'); } catch (e) { u.phase = 'error'; u.error = e.message; notify('update'); }
+  try {
+    const started = await bridge.request('update.check');
+    if (started === false) {                         // the host is already busy with an update job; do not wait for an answer that will not come
+      u.phase = u.info?.status === 'available' ? 'available' : 'idle';
+      notify('update');
+    }
+  } catch (e) { u.phase = 'error'; u.error = e.message; notify('update'); }
 }
 export async function downloadUpdate() {
   const u = state.update;

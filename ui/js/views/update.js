@@ -21,7 +21,8 @@ function notesView(text) {
 
 export function openUpdate() {
   S.state.update.quiet = false;
-  if (S.state.update.phase === 'idle') S.checkUpdate();
+  // clicking the version chip always asks GitHub again, unless a check/download is running or an update is already waiting
+  if (!['checking', 'downloading', 'available', 'staged'].includes(S.state.update.phase)) S.checkUpdate();
   overlay((close) => {
     const box = h('div', { class: 'upd' });
     const paint = () => {
