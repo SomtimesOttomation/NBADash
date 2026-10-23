@@ -6,14 +6,14 @@ import { aggregate, newLeague, leagueAdd, LEAGUE_VERSION } from './stats.js';
 
 // user-adjustable timing: [default, min, max, label, unit, help]
 export const TUNING = {
-  liveSeconds:      [30, 10, 300, 'Live scores', 'seconds', 'How often scores and the watched box score refresh while a game is live or about to start'],
+  liveSeconds:      [30, 10, 300, 'Live Data Interval', 'seconds', 'Refresh interval of live game data'],
   idleMinutes:      [10, 1, 120, 'Scoreboard when idle', 'minutes', 'How often today\'s scoreboard is checked when nothing is live'],
-  oldDayHours:      [6, 1, 48, 'Finished earlier days', 'hours', 'How often a past day whose games are all final is re-checked'],
+  oldDayHours:      [6, 1, 48, 'Fetch Interval Outside of Live Games', 'hours', 'How often data is re-checked outside of live games. It exists only to catch late changes, such as score corrections.'],
   tableLiveMinutes: [15, 5, 120, 'Standings and injuries (games live)', 'minutes', 'Refresh interval while games are live'],
   tableStaleHours:  [6, 1, 48, 'Standings and injuries (idle)', 'hours', 'Refresh only when the saved copy is older than this'],
   teamFreshHours:   [20, 1, 168, 'Team files (sync)', 'hours', 'Rosters, coaches and schedules newer than this are skipped by a sync'],
   tableFreshHours:  [4, 1, 48, 'Standings and injuries (sync)', 'hours', 'A sync skips them if the saved copy is newer than this'],
-  backfillDays:     [7, 1, 30, 'Sync catch-up window', 'days', 'How many days back a normal sync looks for missed games'],
+  backfillDays:     [7, 1, 7, 'Historical Data Sync', 'days', 'Number of days to go back and fetch data. Maximum of 7 days.'],
 };
 export const TUNE_DEFAULTS = Object.fromEntries(Object.entries(TUNING).map(([k, v]) => [k, v[0]]));
 export const state = {

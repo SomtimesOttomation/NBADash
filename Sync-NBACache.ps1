@@ -78,7 +78,7 @@ function Get-Tune {
 }
 $TeamFreshHours  = Get-Tune 'teamFreshHours' 20 1 168
 $TableFreshHours = Get-Tune 'tableFreshHours' 4 1 48
-if (-not $PSBoundParameters.ContainsKey('MaxBackfillDays')) { $MaxBackfillDays = [int](Get-Tune 'backfillDays' 7 1 30) }
+if (-not $PSBoundParameters.ContainsKey('MaxBackfillDays')) { $MaxBackfillDays = [int](Get-Tune 'backfillDays' 7 1 7) }
 if ($Quick) { $MaxBackfillDays = 2 }
 
 function Write-Log {
