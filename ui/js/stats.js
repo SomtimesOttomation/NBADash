@@ -132,28 +132,34 @@ const pct = (m, a) => (a > 0 ? (100 * m) / a : NaN);
 
 // minGames-scaled qualification keeps tiny samples out early in the season
 export const LEADER_DEFS = [
-  { key: 'pts', title: 'Points', unit: 'PPG', v: (p) => per(p, 'pts'), f: 1 },
+  { key: 'pts', loser: 'Fewest Points', title: 'Points', unit: 'PPG', v: (p) => per(p, 'pts'), f: 1 },
   { key: 'reb', title: 'Rebounds', unit: 'RPG', v: (p) => per(p, 'reb'), f: 1 },
   { key: 'ast', title: 'Assists', unit: 'APG', v: (p) => per(p, 'ast'), f: 1 },
   { key: 'tpm', title: '3-Pointers Made', unit: '3PM/G', v: (p) => per(p, 'tpm'), f: 1 },
-  { key: 'fgp', title: 'Field Goal %', unit: 'FG%', v: (p) => pct(p.tot.fgm, p.tot.fga), f: 1, suffix: '%', ok: (p, a) => p.tot.fga >= 3 * a.games, sub: (p) => `${p.tot.fgm}/${p.tot.fga} FG` },
-  { key: 'tpp', title: '3-Point %', unit: '3P%', v: (p) => pct(p.tot.tpm, p.tot.tpa), f: 1, suffix: '%', ok: (p, a) => p.tot.tpa >= 1 * a.games, sub: (p) => `${p.tot.tpm}/${p.tot.tpa} 3PT` },
-  { key: 'ftp', title: 'Free Throw %', unit: 'FT%', v: (p) => pct(p.tot.ftm, p.tot.fta), f: 1, suffix: '%', ok: (p, a) => p.tot.fta >= 1 * a.games, sub: (p) => `${p.tot.ftm}/${p.tot.fta} FT` },
+  { key: 'fgp', loser: 'Worst Field Goal %', title: 'Field Goal %', unit: 'FG%', v: (p) => pct(p.tot.fgm, p.tot.fga), f: 1, suffix: '%', ok: (p, a) => p.tot.fga >= 3 * a.games, sub: (p) => `${p.tot.fgm}/${p.tot.fga} FG` },
+  { key: 'tpp', loser: 'Worst 3-Point %', title: '3-Point %', unit: '3P%', v: (p) => pct(p.tot.tpm, p.tot.tpa), f: 1, suffix: '%', ok: (p, a) => p.tot.tpa >= 1 * a.games, sub: (p) => `${p.tot.tpm}/${p.tot.tpa} 3PT` },
+  { key: 'ftp', loser: 'Worst Free Throw %', title: 'Free Throw %', unit: 'FT%', v: (p) => pct(p.tot.ftm, p.tot.fta), f: 1, suffix: '%', ok: (p, a) => p.tot.fta >= 1 * a.games, sub: (p) => `${p.tot.ftm}/${p.tot.fta} FT` },
   { key: 'stl', title: 'Steals', unit: 'SPG', v: (p) => per(p, 'stl'), f: 1 },
   { key: 'blk', title: 'Blocks', unit: 'BPG', v: (p) => per(p, 'blk'), f: 1 },
   { key: 'stocks', title: 'Stocks (Steals + Blocks)', unit: 'per game', v: (p) => (p.tot.stl + p.tot.blk) / p.gp, f: 1 },
-  { key: 'ortg', title: 'Offensive Rating', unit: 'pts / 100 poss', v: (p, a) => ortg(p.tot, a.T, a.O), f: 1, ok: (p, a) => p.tot.min >= 10 * a.games, note: 'Dean Oliver estimate' },
-  { key: 'drtg', title: 'Defensive Rating', unit: 'lower is better', v: (p, a) => drtg(p.tot, a.T, a.O), f: 1, low: true, ok: (p, a) => p.tot.min >= 10 * a.games, note: 'Dean Oliver estimate' },
-  { key: 'pm', title: 'Plus / Minus', unit: 'per game', v: (p) => per(p, 'pm'), f: 1, signed: true },
-  { key: 'gs', title: 'Game Score', unit: 'avg per game', v: (p) => p.score / p.gp, f: 1, note: 'Hollinger' },
-  { key: 'dd', title: 'Double-Doubles', unit: 'total', v: (p) => p.dd, f: 0, ok: (p) => p.dd > 0 },
+  { key: 'ortg', loser: 'Worst Offensive Rating', title: 'Offensive Rating', unit: 'pts / 100 poss', v: (p, a) => ortg(p.tot, a.T, a.O), f: 1, ok: (p, a) => p.tot.min >= 10 * a.games, note: 'Dean Oliver estimate' },
+  { key: 'drtg', loser: 'Worst Defensive Rating', title: 'Defensive Rating', unit: 'lower is better', v: (p, a) => drtg(p.tot, a.T, a.O), f: 1, low: true, ok: (p, a) => p.tot.min >= 10 * a.games, note: 'Dean Oliver estimate' },
+  { key: 'pm', loser: 'Worst Plus / Minus', title: 'Plus / Minus', unit: 'per game', v: (p) => per(p, 'pm'), f: 1, signed: true },
+  { key: 'efg', loser: 'Worst Effective FG%', title: 'Effective FG%', unit: 'eFG%', v: (p) => (p.tot.fga > 0 ? (100 * (p.tot.fgm + 0.5 * p.tot.tpm)) / p.tot.fga : NaN), f: 1, suffix: '%', ok: (p, a) => p.tot.fga >= 3 * a.games, sub: (p) => `${p.tot.fgm}/${p.tot.fga} FG \u00b7 ${p.tot.tpm} 3PM`, note: '3-pointers count 1.5x' },
+  { key: 'splits', loser: 'Worst Shooting Splits', title: 'Shooting Splits', unit: 'FG% / 3P% / FT%', v: (p) => (pct(p.tot.fgm, p.tot.fga) + pct(p.tot.tpm, p.tot.tpa) + pct(p.tot.ftm, p.tot.fta)) / 3, f: 1, suffix: '%',
+    ok: (p, a) => p.tot.fga >= 3 * a.games && p.tot.tpa >= a.games && p.tot.fta >= a.games, text: (p) => [pct(p.tot.fgm, p.tot.fga), pct(p.tot.tpm, p.tot.tpa), pct(p.tot.ftm, p.tot.fta)].map((x) => Math.round(x)).join(' / '),
+    note: 'ranked by the average of the three' },
+  { key: 'eff', loser: 'Lowest Efficiency', title: 'Efficiency', unit: 'EFF per game', v: (p) => (p.tot.pts + p.tot.reb + p.tot.ast + p.tot.stl + p.tot.blk - (p.tot.fga - p.tot.fgm) - (p.tot.fta - p.tot.ftm) - p.tot.tov) / p.gp, f: 1, note: 'pts + reb + ast + stl + blk - misses - turnovers' },
+  { key: 'tov', loser: 'Most Turnovers', title: 'Turnovers', unit: 'TOV per game', v: (p) => per(p, 'tov'), f: 1, low: true, loserOnly: true },
+  { key: 'pf', loser: 'Most Fouls', title: 'Fouls', unit: 'PF per game', v: (p) => per(p, 'pf'), f: 1, low: true, loserOnly: true },
   { key: 'min', title: 'Minutes', unit: 'MPG', v: (p) => per(p, 'min'), f: 1 },
 ];
 
 // Ranks players for every category. ctxFor(p) gives that player's team context {games, T, O}.
 // minMpg: minutes per team game needed to appear at all; minGpShare: share of team games the player must have played.
-export function rankAll(players, ctxFor, top, { minMpg = 8, minGpShare = 0 } = {}) {
-  return LEADER_DEFS.map((d) => {
+// worst: the Losers view. Same qualification, reversed order, and only the categories where a low number means a player is bad at the game.
+export function rankAll(players, ctxFor, top, { minMpg = 8, minGpShare = 0, worst = false } = {}) {
+  return LEADER_DEFS.filter((d) => (worst ? d.loser : !d.loserOnly)).map((d) => {
     const rows = players
       .filter((p) => {
         const c = ctxFor(p);
@@ -161,10 +167,10 @@ export function rankAll(players, ctxFor, top, { minMpg = 8, minGpShare = 0 } = {
       })
       .map((p) => ({ p, value: d.v(p, ctxFor(p)) }))
       .filter((r) => Number.isFinite(r.value))
-      .sort((a, b) => (d.low ? a.value - b.value : b.value - a.value) || b.p.tot.min - a.p.tot.min)
+      .sort((a, b) => ((d.low !== worst) ? a.value - b.value : b.value - a.value) || b.p.tot.min - a.p.tot.min)   // ties: the player with more minutes ranks first
       .slice(0, top)
-      .map((r) => ({ id: r.p.id, name: r.p.name, team: r.p.team, jersey: r.p.jersey, value: r.value, sub: d.sub ? d.sub(r.p) : `${r.p.gp} GP` }));
-    return { key: d.key, title: d.title, unit: d.unit, f: d.f, suffix: d.suffix || '', signed: !!d.signed, note: d.note || '', rows };
+      .map((r) => ({ id: r.p.id, name: r.p.name, team: r.p.team, jersey: r.p.jersey, value: r.value, text: d.text ? d.text(r.p) : '', sub: d.sub ? d.sub(r.p) : `${r.p.gp} GP` }));
+    return { key: d.key, title: worst ? d.loser : d.title, unit: d.unit, f: d.f, suffix: d.suffix || '', signed: !!d.signed, note: d.note || '', rows };
   });
 }
 
@@ -200,6 +206,10 @@ export function leagueAdd(lg, box) {
 // League leaders: stricter than the team view (10+ minutes a game, and at least half of the team's games played).
 export function leagueLeaders(lg, top = 5) {
   return rankAll(Object.values(lg.players), (p) => (lg.teams[p.team] ? { games: lg.teams[p.team].games, T: lg.teams[p.team].T, O: lg.teams[p.team].O } : null), top, { minMpg: 10, minGpShare: 0.5 });
+}
+
+export function leagueLosers(lg, top = 5) {
+  return rankAll(Object.values(lg.players), (p) => (lg.teams[p.team] ? { games: lg.teams[p.team].games, T: lg.teams[p.team].T, O: lg.teams[p.team].O } : null), top, { minMpg: 10, minGpShare: 0.5, worst: true });
 }
 
 export function fmtValue(v, card) {
