@@ -78,5 +78,11 @@ Cache `%LOCALAPPDATA%\NBADash\cache`, settings `%APPDATA%\NBADash\settings.json`
 - `ui\` the web UI (vanilla ES modules). `ui\dev\mock.js` is the mock host used for browser previews.
 - `tools\` the feed probe scripts used to check what ESPN returns.
 
+## Disclaimer
+
+NBA Dash is an independent, unofficial hobby project. It is not affiliated with, endorsed by or sponsored by ESPN, The Walt Disney Company, the NBA or any team. All names, logos and trademarks belong to their owners.
+
+This repository contains no ESPN or NBA data. The app runs on your own computer and fetches publicly available scores and statistics from ESPN's unofficial web endpoints, which have no published terms, limits or guarantees and can change or stop working at any time. It is provided for personal, noncommercial use. Automatic refresh is off by default for that reason. You are responsible for how you use it, including compliance with the terms of the sites it contacts. The software is provided "as is" under the MIT license, without warranty of any kind.
+
 ## License
 MIT. See `LICENSE`. Data comes from ESPN's public endpoints; team names and logos belong to their owners.
