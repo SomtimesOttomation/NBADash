@@ -8,7 +8,7 @@ export function mount(ctx) {
   S.weekDayKeys(week).forEach((k) => S.loadDay(k));
   draw(ctx);
 }
-export function update(topics, ctx) { if (['days', 'favorites', 'watch', 'teams'].some((t) => topics.has(t))) draw(ctx); }
+export function update(topics, ctx) { if (['days', 'favorites', 'watch', 'teams', 'box'].some((t) => topics.has(t))) draw(ctx); }
 
 function draw({ el }) {
   const keys = S.weekDayKeys(week).filter((k) => S.state.cachedDayKeys.includes(k) || S.state.days.has(k));

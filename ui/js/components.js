@@ -53,7 +53,11 @@ export function statusInfo(ev) {
     const d = String(ev.detail || '');
     let text;
     if (/half/i.test(d)) text = 'HALFTIME';
-    else if (/^end/i.test(d)) text = d.toUpperCase();
+    else if (/^end/i.test(d)) {
+      // "End of 1st Quarter" -> "END Q1", "End of 2nd OT" -> "END 2OT"
+      const m = d.match(/(\d)(?:st|nd|rd|th)\s*(ot|overtime|quarter|qtr)?/i);
+      text = m ? (/ot/i.test(m[2] || '') ? `END ${m[1] === '1' ? '' : m[1]}OT` : `END Q${m[1]}`) : d.toUpperCase();
+    }
     else text = `${periodLabel(ev.period)}${ev.clock ? ' ' + ev.clock : ''}`;
     return { kind: 'live', text, label: 'LIVE' };
   }
@@ -154,11 +158,24 @@ export function gameCard(ev, opts = {}) {
         }, S.state.settings.autoRefresh ? (watched ? '● Watching' : '○ Watch') : '↻ Box score') : null,
         isFavGame ? h('span', { class: 'fav-tag', title: 'Favorite team' }, '★') : null)),
     h('div', { class: 'sides' }, away ? sideRow(ev, away, opts) : null, home ? sideRow(ev, home, opts) : null),
+    lastScoreLine(ev),
     h('footer', { class: 'game-foot' },
-      leaders.length ? h('span', { class: 'leaders' }, leaders.map((x, i) => [i ? '   ' : '', x])) :
-        h('span', { class: 'venue' }, [ev.venue].filter(Boolean).join('')),
-      h('span', { class: 'go' }, ev.state === 'pre' ? 'Preview ›' : 'Box score ›')));
+      leaders.length ? h('span', { class: 'leaders' }, 'Scoring Leaders: ', leaders.map((x, i) => [i ? '   ' : '', x])) :
+        h('span', { class: 'venue' }, [ev.venue].filter(Boolean).join(''))));
   return card;
+}
+
+// Latest basket for a live game, e.g. "+3  Tyrese Maxey makes 26-foot three point jumper (Joel Embiid assists)  Q2 5:21".
+// Comes from the box score fetch, so it only shows once a box score has been loaded for the game.
+function lastScoreLine(ev) {
+  if (ev.state !== 'in') return null;
+  const ls = S.state.boxes.get(String(ev.id))?.lastScore;
+  if (!ls || !ls.text) return null;
+  const kind = ls.value === 3 ? '3PT' : ls.value === 1 ? 'FT' : ls.value === 2 ? '2PT' : '';
+  return h('div', { class: 'lastscore', title: 'Most recent basket' },
+    h('span', { class: `ls-pts v${ls.value}` }, `+${ls.value}${kind ? ' ' + kind : ''}`),
+    h('span', { class: 'ls-text' }, ls.text),
+    h('span', { class: 'ls-when' }, `${periodLabel(ls.period)} ${ls.clock}`));
 }
 
 // ---- banner ------------------------------------------------------------------------------------------------

@@ -135,8 +135,25 @@ function ConvertTo-NbaBox {
             stats = @($_.statistics | ForEach-Object { [pscustomobject]@{ name = $_.name; value = $_.displayValue } })
         }
     })
+    # most recent made basket / free throw, from the play-by-play that already comes with the summary (no extra request); only for games not yet final
+    $lastScore = $null
+    $gState = try { [string]$Sum.header.competitions[0].status.type.state } catch { '' }
+    if ($gState -ne 'post') {
+        try {
+            $abbrById = @{}
+            foreach ($t in $Sum.boxscore.teams) { $abbrById[[string]$t.team.id] = [string]$t.team.abbreviation }
+            $sp = @($Sum.plays | Where-Object { $_.scoringPlay })
+            if ($sp.Count -gt 0) {
+                $pl = if ($sp[0].sequenceNumber) { $sp | Sort-Object { [double]$_.sequenceNumber } | Select-Object -Last 1 } else { $sp[$sp.Count - 1] }
+                $lastScore = [pscustomobject]@{
+                    text = [string]$pl.text; value = [int]$pl.scoreValue; team = $abbrById[[string]$pl.team.id]
+                    period = [int]$pl.period.number; clock = [string]$pl.clock.displayValue; type = [string]$pl.type.text
+                }
+            }
+        } catch { $lastScore = $null }
+    }
     return [pscustomobject]@{
-        id = [string]$Game.id; date = $Game.date; name = $Game.name
+        id = [string]$Game.id; date = $Game.date; name = $Game.name; lastScore = $lastScore
         venue = $Sum.gameInfo.venue.fullName; city = $Sum.gameInfo.venue.address.city
         attendance = $Sum.gameInfo.attendance
         teams = $boxTeams; teamStats = $teamStats; syncedAt = (Get-Date).ToString('s')

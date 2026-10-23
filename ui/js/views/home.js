@@ -4,7 +4,7 @@ import { gameCard, sortEvents, sectionHead, emptyState, skeletonCards } from '..
 
 export function mount(ctx) { draw(ctx); S.loadDay(S.todayKey()); S.loadDay(S.yesterdayKey()); }
 export function update(topics, ctx) {
-  if (['days', 'favorites', 'watch', 'teams', 'sync'].some((t) => topics.has(t))) draw(ctx);
+  if (['days', 'favorites', 'watch', 'teams', 'sync', 'box'].some((t) => topics.has(t))) draw(ctx);
 }
 
 function section(key, title, ctx) {
