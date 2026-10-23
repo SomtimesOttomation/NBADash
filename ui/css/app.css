@@ -329,3 +329,6 @@ a.plink:hover { color: var(--accent2); }
 .ls-pts.v3 { color: #d9822b; }
 .ls-text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ls-when { flex: 0 0 auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* final games: the losing team's score fades further so winner and loser separate clearly */
+.side.lose .score { opacity: .6; font-weight: 500; }
