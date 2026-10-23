@@ -203,6 +203,36 @@ function ReplyError {
     Send-Page ('{{"id":{0},"ok":false,"error":{1}}}' -f $Id, (ConvertTo-Json -InputObject $Message -Compress))
 }
 
+# ---------------------------------------------------------------- nightly sync (Windows scheduled task, opt-in)
+$script:NightlyTaskName = 'NBADash Nightly Sync'
+function Get-NightlyTask {
+    $r = @{ exists = $false; time = ''; state = '' }
+    try {
+        $t = Get-ScheduledTask -TaskName $script:NightlyTaskName -ErrorAction Stop
+        $r.exists = $true; $r.state = [string]$t.State
+        $trg = @($t.Triggers)[0]
+        if ($trg -and $trg.StartBoundary) { $r.time = ([datetime]$trg.StartBoundary).ToString('HH:mm') }
+    } catch { }
+    return $r
+}
+# Creates, changes or removes the task by running the same Register-NBASyncTask.ps1 the README documents (current user, no admin rights).
+function Set-NightlyTask {
+    param([string]$Time, [bool]$Remove)
+    $reg = Join-Path $Root 'Register-NBASyncTask.ps1'
+    $argsList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f $reg), '-ScriptPath', ('"{0}"' -f (Join-Path $Root 'Sync-NBACache.ps1')))
+    if ($Remove) { $argsList += '-Unregister' } else { $argsList += '-Time'; $argsList += $Time }
+    $outFile = Join-Path ([IO.Path]::GetTempPath()) 'nbadash-schedule.out'
+    $msg = ''
+    try {
+        $p = Start-Process -FilePath 'powershell.exe' -ArgumentList $argsList -WindowStyle Hidden -PassThru -RedirectStandardOutput $outFile
+        if (-not $p.WaitForExit(30000)) { try { $p.Kill() } catch { } }
+        if (Test-Path $outFile) { $msg = (@(Get-Content $outFile) | Where-Object { $_ } | Select-Object -First 2) -join ' ' }
+    } catch { $msg = $_.Exception.Message }
+    $st = Get-NightlyTask
+    $ok = if ($Remove) { -not $st.exists } else { $st.exists -and $st.time -eq $Time }
+    return @{ ok = $ok; exists = $st.exists; time = $st.time; message = $msg }
+}
+
 function Save-Settings {
     [IO.File]::WriteAllText($SettingsPath, ($script:Settings | ConvertTo-Json -Depth 5), $utf8)
 }
@@ -279,6 +309,13 @@ function Invoke-Command2 {
             try { if ($script:SyncProc -and -not $script:SyncProc.HasExited) { $script:SyncProc.Kill() } } catch { }
             Reply $Msg.id 'true'
         }
+        'schedule.get' { Reply $Msg.id ((Get-NightlyTask) | ConvertTo-Json -Compress) }
+        'schedule.set' {
+            $t = [string]$a.time
+            if ($t -notmatch '^([01]\d|2[0-3]):[0-5]\d$') { ReplyError $Msg.id 'bad time'; return }
+            Reply $Msg.id ((Set-NightlyTask -Time $t -Remove $false) | ConvertTo-Json -Compress)
+        }
+        'schedule.remove' { Reply $Msg.id ((Set-NightlyTask -Time '' -Remove $true) | ConvertTo-Json -Compress) }
         'live.refresh' { $script:Shared.RefreshNow = $true; Reply $Msg.id 'true' }
         'sync.run' {
             $mode = if ($a.mode -in 'favorites', 'all', 'force', 'team', 'history', 'historyBoxes') { $a.mode } else { 'favorites' }
