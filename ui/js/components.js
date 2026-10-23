@@ -160,9 +160,8 @@ export function gameCard(ev, opts = {}) {
     h('div', { class: 'sides' }, away ? sideRow(ev, away, opts) : null, home ? sideRow(ev, home, opts) : null),
     lastScoreLine(ev),
     h('footer', { class: 'game-foot' },
-      leaders.length ? h('span', { class: 'leaders' }, leaders.map((x, i) => [i ? '   ' : '', x])) :
-        h('span', { class: 'venue' }, [ev.venue].filter(Boolean).join('')),
-      h('span', { class: 'go' }, ev.state === 'pre' ? 'Preview ›' : 'Box score ›')));
+      leaders.length ? h('span', { class: 'leaders' }, 'Scoring Leaders: ', leaders.map((x, i) => [i ? '   ' : '', x])) :
+        h('span', { class: 'venue' }, [ev.venue].filter(Boolean).join(''))));
   return card;
 }
 
