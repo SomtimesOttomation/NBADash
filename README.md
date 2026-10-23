@@ -8,7 +8,7 @@ a nightly cache sync, and a secret traffic counter (click the "NBA 2026-27" titl
 2. Double-click `Start-NBADash.bat`. On first run it downloads the WebView2 wrapper DLLs into `lib\` (no admin needed).
    The WebView2 runtime itself ships with Edge.
 3. Star your teams in the banner. A newly starred team triggers a quick sync for it right away.
-4. Optional: `Register-NBASyncTask.ps1 -RunNow` schedules the nightly sync (04:00) so box scores and rosters are cached
+4. Optional: turn on the nightly sync in Settings (pick any time, change or remove it later), or run `Register-NBASyncTask.ps1 -Time 04:00 -RunNow`. Either way it schedules the nightly sync (default 04:00, this computer's local time) so box scores and rosters are cached
    for the next launch. Use "Watch" on a live game for live box scores (favorites are auto-watched).
 
 ## Files

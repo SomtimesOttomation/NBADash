@@ -15,6 +15,7 @@ const TEAMS = [
 let emit = () => {};
 const today = etKey(new Date());
 const yest = addDaysKey(today, -1);
+let nightly = { exists: false, time: '', state: '' };
 let settings = { favorites: ['TOR'], theme: 'system', liveSeconds: 30, autoWatch: true };
 const watch = new Set();
 const stats = { requests: 0, bytes: 0, wireBytes: 0, errors: 0, byKind: {} };
@@ -158,6 +159,9 @@ export async function request(cmd, args) {
     case 'settings.save': settings = args.settings; return true;
     case 'cache.write': leagueFile = JSON.parse(args.text); return true;
     case 'sync.cancel': return true;
+    case 'schedule.get': return { ...nightly };
+    case 'schedule.set': nightly = { exists: true, time: args.time, state: 'Ready' }; return { ok: true, ...nightly, message: 'Registered' };
+    case 'schedule.remove': nightly = { exists: false, time: '', state: '' }; return { ok: true, ...nightly, message: 'Removed' };
     case 'sync.run': {
       if (syncing) return false;
       syncing = true; let pct = 0;

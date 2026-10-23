@@ -32,11 +32,55 @@ export function openSettings() {
       h('p', null, h('b', null, 'Data cache '), h('small', null, S.state.cacheDir || '(dev preview)')),
       syncPanel(),
       h('hr', { style: { border: 0, borderTop: '1px solid var(--line)' } }),
+      nightlyPanel(),
+      h('hr', { style: { border: 0, borderTop: '1px solid var(--line)' } }),
       timingPanel(),
       h('p', { style: { textAlign: 'right' } }, h('button', { class: 'btn primary', type: 'button', onclick: close }, 'Done')));
   });
 }
 void displayCode;
+
+// Nightly sync: a Windows scheduled task (current user, no admin rights) that runs the cache sync at a time the person picks.
+// Off until they turn it on; it contacts ESPN on its own, so enabling needs the same acknowledgement as automatic refresh.
+function nightlyPanel() {
+  const box = h('div');
+  let st = null, busy = false, msg = '', ackOn = false;
+  const call = async (cmd, args) => {
+    busy = true; paint();
+    try {
+      const r = await bridge.request(cmd, args, 45000);
+      st = { exists: !!r.exists, time: r.time || '' };
+      msg = r.ok === false ? `Could not change the task${r.message ? ': ' + r.message : ''}` : (cmd === 'schedule.remove' ? 'Nightly sync turned off.' : cmd === 'schedule.set' ? `Nightly sync set for ${r.time}.` : '');
+    } catch (e) { msg = e.message || 'Could not reach the scheduler.'; }
+    busy = false; paint();
+  };
+  const paint = () => {
+    const time = h('input', { type: 'time', class: 'tune-input', style: { width: '110px' }, value: st?.time || '04:00', 'aria-label': 'Nightly sync time', required: true });
+    const valid = () => /^([01]\d|2[0-3]):[0-5]\d$/.test(time.value);
+    const head = h('p', null, h('b', null, 'Nightly sync '),
+      st === null ? h('small', null, 'checking\u2026') : st.exists ? h('small', null, `scheduled daily at ${st.time} (this computer\u2019s local time)`) : h('small', null, 'off'));
+    if (!S.state.host) { box.replaceChildren(head, h('small', null, 'Available in the desktop app.')); return; }
+    let controls;
+    if (st && st.exists) {
+      controls = h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' } }, time,
+        h('button', { class: 'btn', type: 'button', disabled: busy ? true : null, onclick: () => { if (valid()) call('schedule.set', { time: time.value }); } }, 'Change time'),
+        h('button', { class: 'btn', type: 'button', disabled: busy ? true : null, onclick: () => call('schedule.remove') }, 'Turn off'));
+    } else if (st) {
+      const ack = h('input', { type: 'checkbox', checked: ackOn ? true : null });
+      const go = h('button', { class: 'btn primary', type: 'button', disabled: (busy || !ackOn) ? true : null, onclick: () => { if (valid()) call('schedule.set', { time: time.value }); } }, 'Schedule nightly sync');
+      ack.addEventListener('change', () => { ackOn = ack.checked; go.disabled = busy || !ackOn; });
+      controls = h('div', null,
+        h('small', null, 'Runs the cache sync once a day (about 35 requests to ESPN for rosters, schedules, standings, injuries and new box scores), even if you are not using the app. Missed runs start when the PC is next awake and online. Like automatic refresh, this contacts ESPN without you pressing anything, which ESPN may not welcome.'),
+        h('div', { style: { margin: '8px 0', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' } }, h('span', null, 'Run daily at '), time),
+        h('label', null, ack, ' I understand and accept this risk'),
+        h('div', { style: { marginTop: '8px' } }, go));
+    }
+    box.replaceChildren(...[head, controls, msg ? h('small', { style: { display: 'block', marginTop: '6px' } }, msg) : null].filter(Boolean));
+  };
+  paint();
+  bridge.request('schedule.get').then((r) => { st = { exists: !!r.exists, time: r.time || '' }; paint(); }).catch(() => { st = { exists: false, time: '' }; msg = 'Could not read the scheduled task.'; paint(); });
+  return box;
+}
 
 // Automatic refresh is opt-in. Off (default): ESPN is contacted only when the person presses refresh, opens a box score or runs a sync.
 // On: the person has accepted the warning and can tune how often the app polls. Values are clamped and saved on change.
