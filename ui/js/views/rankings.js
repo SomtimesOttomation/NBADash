@@ -39,11 +39,11 @@ const gradeBadge = (g) => h('span', { class: gcls(g) }, g);
 function reportTable(rep) {
   const f1 = (v) => v.toFixed(1), sg = (v) => (v > 0 ? '+' : '') + v.toFixed(1);
   return h('div', { class: 'card tr-wrap' }, h('table', { class: 'tr-table' },
-    h('thead', null, h('tr', null, [['#'], ['Team'], ['Overall', 'grade'], ['Offense', 'grade'], ['Defense', 'grade'], ['Net', 'net'], ['ORtg', 'ortg'], ['DRtg', 'drtg'], ['eFG%', 'efg'], ['GP']].map(([t, k], i) => h('th', { class: i > 1 ? 'num' : '' }, k ? h('span', calc(k, 'team'), t) : t)))),
+    h('thead', null, h('tr', null, [['#'], ['Team'], ['Overall', 'grade'], ['Offense', 'grade'], ['Defense', 'grade'], ['Net', 'net'], ['SRS', 'srs'], ['ORtg', 'ortg'], ['DRtg', 'drtg'], ['eFG%', 'efg'], ['GP']].map(([t, k], i) => h('th', { class: i > 1 ? 'num' : '' }, k ? h('span', calc(k, 'team'), t) : t)))),
     h('tbody', null, rep.map((r) => h('tr', null,
       h('td', { class: 'rk' }, r.overall.rank), h('td', null, teamCell(r.abbr)),
       h('td', { class: 'num' }, gradeBadge(r.overall.grade)), h('td', { class: 'num' }, gradeBadge(r.offGrade)), h('td', { class: 'num' }, gradeBadge(r.defGrade)),
-      h('td', { class: 'num' }, sg(r.net)), h('td', { class: 'num' }, f1(r.ortg)), h('td', { class: 'num' }, f1(r.drtg)), h('td', { class: 'num' }, f1(r.efg)), h('td', { class: 'num' }, r.games))))));
+      h('td', { class: 'num' }, sg(r.net)), h('td', { class: 'num' }, sg(r.srs)), h('td', { class: 'num' }, f1(r.ortg)), h('td', { class: 'num' }, f1(r.drtg)), h('td', { class: 'num' }, f1(r.efg)), h('td', { class: 'num' }, r.games))))));
 }
 
 // "counted in 40 of 52 games" for the Native formula (older saves fall back to the estimate)

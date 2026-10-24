@@ -9,6 +9,7 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 **Feature**
 - Hover any calculated stat to see its formula and reasoning.
 - New Ratings formula setting: Native (counted possessions), Basketball-Reference or NBA.com.
+- Team Rankings adds Pace, Simple Rating System (SRS) and Strength of Schedule; Report Card shows SRS.
 
 **Bug/Fix**
 - Team ratings now count possessions the same way as player ratings.

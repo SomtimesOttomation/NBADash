@@ -20,8 +20,10 @@ export function teamRows(lg, method = 'native') {
     const P = teamPoss(t, method);
     if (!(P.o > 0) || !(P.d > 0)) continue;
     const ortg = (100 * T.pts) / P.o, drtg = (100 * O.pts) / P.d;
+    const teamMin = T.min > 0 ? T.min : games * 240;
     rows.push({
-      abbr, games, poss: P.o / games, counted: P.counted,
+      abbr, games, poss: P.o / games, counted: P.counted, opp: t.opp || {},
+      pace: (48 * ((P.o + P.d) / 2)) / (teamMin / 5),
       ppg: T.pts / games, oppg: O.pts / games, diff: (T.pts - O.pts) / games,
       ortg, drtg, net: ortg - drtg,
       fgp: 100 * rate(T.fgm, T.fga), tpp: 100 * rate(T.tpm, T.tpa), ftp: 100 * rate(T.ftm, T.fta),
@@ -36,7 +38,27 @@ export function teamRows(lg, method = 'native') {
       },
     });
   }
+  addSrs(rows);
   return rows;
+}
+
+// Simple Rating System (Basketball-Reference): average margin adjusted for the strength of the opponents faced.
+// SRS = MOV + SOS, where SOS is the average SRS of the opponents; solved by repeating until the numbers settle.
+function addSrs(rows) {
+  const by = new Map(rows.map((r) => [r.abbr, r]));
+  rows.forEach((r) => { r.srs = r.diff; r.sos = 0; });
+  for (let it = 0; it < 200; it++) {
+    let moved = 0;
+    const next = rows.map((r) => {
+      let w = 0, sum = 0;
+      for (const [o, n] of Object.entries(r.opp)) { const x = by.get(o); if (x) { sum += n * x.srs; w += n; } }
+      const sos = w ? sum / w : 0;
+      return { r, sos, srs: r.diff + sos };
+    });
+    const mean = next.reduce((a, x) => a + x.srs, 0) / (next.length || 1);
+    next.forEach((x) => { const v = x.srs - mean; moved = Math.max(moved, Math.abs(v - x.r.srs)); x.r.srs = v; x.r.sos = x.sos - mean; });
+    if (moved < 1e-6) break;
+  }
 }
 
 // [key, title, loser title, unit, decimals, suffix, signed, lowerIsBetter]
@@ -47,6 +69,9 @@ export const TEAM_DEFS = [
   ['ortg', 'Offensive Rating', 'Worst Offensive Rating', 'pts / 100 poss', 1, '', false, false],
   ['drtg', 'Defensive Rating', 'Worst Defensive Rating', 'lower is better', 1, '', false, true],
   ['net', 'Net Rating', 'Worst Net Rating', 'per 100 poss', 1, '', true, false],
+  ['srs', 'Simple Rating System', 'Worst SRS', 'margin + schedule', 1, '', true, false],
+  ['sos', 'Toughest Schedule', 'Easiest Schedule', 'strength of schedule', 1, '', true, false],
+  ['pace', 'Fastest Pace', 'Slowest Pace', 'poss / 48 min', 1, '', false, false],
   ['efg', 'Effective FG%', 'Worst Effective FG%', 'eFG%', 1, '%', false, false],
   ['fgp', 'Field Goal %', 'Worst Field Goal %', 'FG%', 1, '%', false, false],
   ['tpp', '3-Point %', 'Worst 3-Point %', '3P%', 1, '%', false, false],

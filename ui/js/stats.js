@@ -188,7 +188,7 @@ export function rankAll(players, ctxFor, top, { minMpg = 8, minGpShare = 0, wors
 export function leaders(agg, top = 3) { return rankAll(agg.players, () => agg, top); }
 
 // ---------------------------------------------------------------- league-wide, built one saved box score at a time
-export const LEAGUE_VERSION = 3;   // 3: rebuild once to add counted possessions (Native ratings)
+export const LEAGUE_VERSION = 4;   // 4: rebuild once to add counted possessions (Native ratings) and opponents faced (SRS)
 
 // ---------------------------------------------------------------- possessions (team ratings formula setting)
 // Basketball-Reference / Dean Oliver: 0.4 x FTA and a weighted offensive-rebound adjustment, team and opponent averaged.
@@ -216,9 +216,11 @@ export function leagueAdd(lg, box) {
   if (!boxComplete(box)) return false;
   for (let i = 0; i < 2; i++) {
     const mine = box.teams[i], theirs = box.teams[1 - i];
-    const te = lg.teams[mine.team] || (lg.teams[mine.team] = { games: 0, T: emptyTot(), O: emptyTot(), nat: { o: 0, d: 0, counted: 0 } });
+    const te = lg.teams[mine.team] || (lg.teams[mine.team] = { games: 0, T: emptyTot(), O: emptyTot(), nat: { o: 0, d: 0, counted: 0 }, opp: {} });
     if (!te.nat) te.nat = { o: 0, d: 0, counted: 0 };
+    if (!te.opp) te.opp = {};
     te.games++;
+    te.opp[theirs.team] = (te.opp[theirs.team] || 0) + 1;      // opponents faced, for strength of schedule
     const gT = teamTotals(mine), gO = teamTotals(theirs);
     addTot(te.T, gT); addTot(te.O, gO);
     // Native: possessions counted from the play-by-play when the saved box score has them, else this game's estimate
