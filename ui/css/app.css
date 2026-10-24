@@ -403,3 +403,8 @@ a.plink:hover { color: var(--accent2); }
 .gf-swing-text::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #f5a524; margin-right: 6px; }
 .gf-facts { margin: 4px 0 8px; font-size: 13px; }
 .gf-tbl td:not(:first-child), .gf-tbl th:not(:first-child) { text-align: center; }
+
+/* form rating */
+.form-chip { font-size: 14px; }
+.form-chip b.pos { color: var(--good); }
+.form-chip b.neg { color: var(--live); }

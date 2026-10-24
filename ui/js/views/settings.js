@@ -40,8 +40,11 @@ function generalTab(close, repaint) {
 }
 
 function dataTab() {
+  const s = S.state.settings;
   return [
     ratingsPanel(),
+    h('p', null, h('label', null, h('input', { type: 'checkbox', checked: s.showForm !== false ? true : null, onchange: (e) => S.saveSettings({ showForm: e.target.checked }) }),
+      ' Show the Form rating (DARKO-style) on Leaderboards and player pages')),
     hr(),
     h('p', null, h('b', null, 'Data cache '), h('small', null, S.state.cacheDir || '(dev preview)')),
     syncPanel(),

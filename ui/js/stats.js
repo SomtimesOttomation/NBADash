@@ -150,6 +150,8 @@ export const LEADER_DEFS = [
     ok: (p, a) => p.tot.fga >= 3 * a.games && p.tot.tpa >= a.games && p.tot.fta >= a.games, text: (p) => [pct(p.tot.fgm, p.tot.fga), pct(p.tot.tpm, p.tot.tpa), pct(p.tot.ftm, p.tot.fta)].map((x) => Math.round(x)).join(' / '),
     note: 'ranked by the average of the three' },
   { key: 'eff', loser: 'Lowest Efficiency', title: 'Efficiency', unit: 'EFF per game', v: (p) => (p.tot.pts + p.tot.reb + p.tot.ast + p.tot.stl + p.tot.blk - (p.tot.fga - p.tot.fgm) - (p.tot.fta - p.tot.ftm) - p.tot.tov) / p.gp, f: 1, note: 'pts + reb + ast + stl + blk - misses - turnovers' },
+  { key: 'form', title: 'In Form (DARKO-style)', loser: 'Out of Form (DARKO-style)', unit: 'vs league avg', v: (p) => p.form, f: 1, signed: true, noEdge: true, leagueOnly: true,
+    sub: (p) => `${p.formTrend > 0.3 ? '\u2191' : p.formTrend < -0.3 ? '\u2193' : '\u2192'} ${p.gp} GP` },
   { key: 'tov', loser: 'Most Turnovers', title: 'Turnovers', unit: 'TOV per game', v: (p) => per(p, 'tov'), f: 1, low: true, loserOnly: true },
   { key: 'pf', loser: 'Most Fouls', title: 'Fouls', unit: 'PF per game', v: (p) => per(p, 'pf'), f: 1, low: true, loserOnly: true },
   { key: 'min', title: 'Minutes', unit: 'MPG', v: (p) => per(p, 'min'), f: 1 },
@@ -167,8 +169,8 @@ export function gpAdjust(rows, valueOf, gamesOf, k = GP_WEIGHT) {
   return (r) => { const v = valueOf(r), n = gamesOf(r); return k > 0 && n > 0 ? (n * v + k * mean) / (n + k) : v; };
 }
 
-export function rankAll(players, ctxFor, top, { minMpg = 8, minGpShare = 0, worst = false, gpWeight = 0 } = {}) {
-  return LEADER_DEFS.filter((d) => (worst ? d.loser : !d.loserOnly)).map((d) => {
+export function rankAll(players, ctxFor, top, { minMpg = 8, minGpShare = 0, worst = false, gpWeight = 0, league = false, form = false } = {}) {
+  return LEADER_DEFS.filter((d) => (worst ? d.loser : !d.loserOnly) && (!d.leagueOnly || (league && form))).map((d) => {
     const rows = players
       .filter((p) => {
         const c = ctxFor(p);
@@ -176,7 +178,7 @@ export function rankAll(players, ctxFor, top, { minMpg = 8, minGpShare = 0, wors
       })
       .map((p) => ({ p, value: d.v(p, ctxFor(p)) }))
       .filter((r) => Number.isFinite(r.value));
-    const adj = gpAdjust(rows, (r) => r.value, (r) => r.p.gp, gpWeight);
+    const adj = gpAdjust(rows, (r) => r.value, (r) => r.p.gp, d.noEdge ? 0 : gpWeight);
     rows.forEach((r) => { r.rank = adj(r); });
     return { key: d.key, title: worst ? d.loser : d.title, unit: d.unit, f: d.f, suffix: d.suffix || '', signed: !!d.signed, note: d.note || '', rows: rows
       .sort((a, b) => ((!!d.low !== worst) ? a.rank - b.rank : b.rank - a.rank) || b.p.tot.min - a.p.tot.min)   // ties: the player with more minutes ranks first
@@ -188,7 +190,8 @@ export function rankAll(players, ctxFor, top, { minMpg = 8, minGpShare = 0, wors
 export function leaders(agg, top = 3) { return rankAll(agg.players, () => agg, top); }
 
 // ---------------------------------------------------------------- league-wide, built one saved box score at a time
-export const LEAGUE_VERSION = 4;   // 4: rebuild once to add counted possessions (Native ratings) and opponents faced (SRS)
+export const LEAGUE_VERSION = 5;   // 5: per-game log per player (Form rating)
+export const LEAGUE_VERSION_PREV = 4;   // 4: rebuild once to add counted possessions (Native ratings) and opponents faced (SRS)
 
 // ---------------------------------------------------------------- possessions (team ratings formula setting)
 // Basketball-Reference / Dean Oliver: 0.4 x FTA and a weighted offensive-rebound adjustment, team and opponent averaged.
@@ -235,6 +238,7 @@ export function leagueAdd(lg, box) {
       let e = lg.players[key];
       if (!e) e = lg.players[key] = { id: p.id, name: p.name, team: mine.team, pos: p.pos, jersey: p.jersey, gp: 0, gs: 0, score: 0, dd: 0, tot: emptyTot() };
       e.gp++; e.name = p.name; e.pos = p.pos || e.pos; e.jersey = p.jersey || e.jersey;
+      (e.log || (e.log = [])).push([dayNum(box.date), Math.round(l.min), Math.round(gameScore(l) * 10) / 10, l.pm]);   // per-game line for the Form rating
       addTot(e.tot, l);
       e.score += gameScore(l);
       if ([l.pts, l.reb, l.ast, l.stl, l.blk].filter((x) => x >= 10).length >= 2) e.dd++;
@@ -245,12 +249,14 @@ export function leagueAdd(lg, box) {
 }
 
 // League leaders: stricter than the team view (10+ minutes a game, and at least half of the team's games played).
-export function leagueLeaders(lg, top = 5) {
-  return rankAll(Object.values(lg.players), (p) => (lg.teams[p.team] ? { games: lg.teams[p.team].games, T: lg.teams[p.team].T, O: lg.teams[p.team].O } : null), top, { minMpg: 10, minGpShare: 0.5, gpWeight: GP_WEIGHT });
+export function leagueLeaders(lg, top = 5, { form = true } = {}) {
+  if (form) applyForm(lg);
+  return rankAll(Object.values(lg.players), (p) => (lg.teams[p.team] ? { games: lg.teams[p.team].games, T: lg.teams[p.team].T, O: lg.teams[p.team].O } : null), top, { minMpg: 10, minGpShare: 0.5, gpWeight: GP_WEIGHT, league: true, form });
 }
 
-export function leagueLosers(lg, top = 5) {
-  return rankAll(Object.values(lg.players), (p) => (lg.teams[p.team] ? { games: lg.teams[p.team].games, T: lg.teams[p.team].T, O: lg.teams[p.team].O } : null), top, { minMpg: 10, minGpShare: 0.5, worst: true, gpWeight: GP_WEIGHT });
+export function leagueLosers(lg, top = 5, { form = true } = {}) {
+  if (form) applyForm(lg);
+  return rankAll(Object.values(lg.players), (p) => (lg.teams[p.team] ? { games: lg.teams[p.team].games, T: lg.teams[p.team].T, O: lg.teams[p.team].O } : null), top, { minMpg: 10, minGpShare: 0.5, worst: true, gpWeight: GP_WEIGHT, league: true, form });
 }
 
 export function fmtValue(v, card) {
@@ -281,3 +287,34 @@ export function playersOfGame(box, top = 3) {
 // ---------------------------------------------------------------- roster ordering
 const POS = { PG: 1, G: 1.5, SG: 2, GF: 2.5, SF: 3, F: 3.5, PF: 4, FC: 4.5, C: 5 };
 export const posRank = (pos) => POS[String(pos || '').toUpperCase()] ?? 6;
+
+// ---------------------------------------------------------------- Form rating (inspired by DARKO, not DARKO)
+// A Kalman filter over each player's games in date order: every game nudges the rating, recent games count more,
+// a game with few minutes counts less, and a small sample is pulled toward the league average.
+// Game value = Game Score per 36 minutes + 0.3 x plus-minus per 36. Shown relative to the league average (0 = average).
+const dayNum = (d) => { const s = String(d || '').slice(0, 10).replace(/-/g, ''); return /^\d{8}$/.test(s) ? Number(s) : 0; };
+export const FORM = { prior: 25, noise: 64, drift: 0.6, pmWeight: 0.3 };
+const dayGap = (a, b) => { if (!a || !b) return 1; const t = (n) => Date.UTC(Math.floor(n / 1e4), Math.floor(n / 100) % 100 - 1, n % 100); return Math.max(1, (t(b) - t(a)) / 864e5); };
+export function applyForm(lg) {
+  const all = Object.values(lg.players || {});
+  const val = (g) => (g[1] > 0 ? (g[2] * 36) / g[1] + FORM.pmWeight * ((g[3] * 36) / g[1]) : NaN);
+  // league average game value, minutes-weighted
+  let sw = 0, sv = 0;
+  for (const p of all) for (const g of p.log || []) { const v = val(g); if (Number.isFinite(v) && g[1] >= 5) { sv += v * g[1]; sw += g[1]; } }
+  const mean = sw ? sv / sw : 0;
+  for (const p of all) {
+    const games = (p.log || []).filter((g) => g[1] > 0).sort((a, b) => a[0] - b[0]);
+    let x = mean, P = FORM.prior, prevDay = 0;
+    const hist = [];
+    for (const g of games) {
+      P += FORM.drift * Math.min(10, dayGap(prevDay, g[0]));      // ratings can drift between games, more over long gaps
+      const R = (FORM.noise * 36) / Math.max(g[1], 6);               // short stints are noisy
+      const K = P / (P + R);
+      x += K * (val(g) - x); P *= (1 - K);
+      prevDay = g[0]; hist.push(x);
+    }
+    p.form = games.length ? x - mean : NaN;
+    p.formTrend = hist.length > 5 ? x - hist[hist.length - 6] : 0;
+  }
+  return mean;
+}

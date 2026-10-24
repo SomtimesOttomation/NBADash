@@ -3,13 +3,16 @@ import { h } from '../util.js';
 import { teamLogo, teamColor, avatar, emptyState, headshotUrl } from '../components.js';
 import { displayCode } from '../arenas.js';
 import { currentRow, seasonRow, pick, show, heightText, weightText, dobText } from '../players.js';
+import { applyForm } from '../stats.js';
+import { calc } from '../formulas.js';
 
 export function mount(ctx) {
   S.loadPlayer(ctx.arg);
+  if (S.state.settings.showForm !== false) S.loadLeague();
   draw(ctx);
 }
 export function update(topics, ctx) {
-  if (topics.has(`player:${ctx.arg}`) || topics.has('compare') || topics.has('teams')) draw(ctx);
+  if (topics.has(`player:${ctx.arg}`) || topics.has('compare') || topics.has('teams') || topics.has('league') || topics.has('settings')) draw(ctx);
 }
 
 const TILES = ['PTS', 'REB', 'AST', 'STL', 'BLK', 'FG%', '3P%', 'FT%'];
@@ -82,6 +85,24 @@ function history(p) {
         p.career.avg.length ? h('tr', { class: 'grp' }, h('td', null, 'Career'), h('td', null, ''), cols.map((l) => h('td', { style: { textTransform: 'none' } }, show(l, pick(p, 'avg', p.career.avg, l))))) : null))));
 }
 
+// Form rating (DARKO-style) from the league's saved box scores; the latest team's line for a traded player.
+let formMemo = { rev: -1 };
+function formChip(id) {
+  const L = S.state.league;
+  if (S.state.settings.showForm === false || !L.data) return null;
+  if (formMemo.rev !== L.rev) { applyForm(L.data); formMemo = { rev: L.rev }; }
+  const lines = Object.values(L.data.players).filter((p) => String(p.id) === String(id) && Number.isFinite(p.form));
+  if (!lines.length) return null;
+  const last = (p) => Math.max(0, ...(p.log || []).map((g) => g[0]));
+  const p = lines.sort((a, b) => last(b) - last(a))[0];
+  const gp = lines.reduce((a, x) => a + x.gp, 0);
+  const arrow = p.formTrend > 0.3 ? '\u2191' : p.formTrend < -0.3 ? '\u2193' : '\u2192';
+  return h('div', { class: 'form-chip', style: { marginTop: '8px' } },
+    h('span', calc('form', 'player'), 'Form'), ' ',
+    h('b', { class: p.form >= 0 ? 'pos' : 'neg' }, `${p.form > 0 ? '+' : ''}${p.form.toFixed(1)} ${arrow}`),
+    h('small', { class: 'muted' }, ` vs league avg \u00b7 ${gp} GP`));
+}
+
 function draw({ el, arg }) {
   const e = S.state.players.get(arg);
   const p = e?.player;
@@ -100,6 +121,7 @@ function draw({ el, arg }) {
     h('div', { class: 'pl-left' }, photo(b),
       h('h1', null, b.name),
       h('div', { class: 'meta' }, [b.team ? displayCode(b.team) : '', b.pos, b.jersey ? `#${b.jersey}` : ''].filter(Boolean).join(' · ')),
+      formChip(arg),
       h('div', { style: { marginTop: '12px' } }, cmpBtn)),
     h('div', { class: 'pl-right scroll-x' }, bioTable(b)));
   const stale = e.loading ? h('small', { class: 'muted' }, 'Refreshing from ESPN…') : null;
