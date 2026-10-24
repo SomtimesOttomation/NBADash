@@ -18,29 +18,59 @@ function overlay(content) {
 }
 export { overlay };
 
+const TAB_KEY = 'nbadash.settingsTab';
+let settingsTab = 'general';
+try { const v = localStorage.getItem(TAB_KEY); if (['general', 'data', 'sync'].includes(v)) settingsTab = v; } catch (e) { /* ignore */ }
+
+const hr = () => h('hr', { style: { border: 0, borderTop: '1px solid var(--line)' } });
+
+function generalTab(close, repaint) {
+  const s = S.state.settings;
+  const favs = S.favSet();
+  return [
+    h('p', null, h('b', null, 'Theme '),
+      [['system', 'System'], ['light', 'Light'], ['dark', 'Dark']].map(([t, label]) => h('button', { class: `btn ${s.theme === t ? 'primary' : ''}`, type: 'button', style: { marginRight: '6px' }, onclick: () => { S.saveSettings({ theme: t }); repaint(); } }, label))),
+    hr(),
+    h('p', null, h('b', null, 'Check for Updates')),
+    h('p', null, h('label', null, h('input', { type: 'checkbox', checked: s.updateCheck !== false ? true : null, onchange: (e) => S.saveSettings({ updateCheck: e.target.checked }) }),
+      ' Check GitHub for a new version when the app starts '), h('button', { class: 'btn', type: 'button', style: { marginLeft: '8px' }, onclick: () => { close(); openUpdate(); } }, `v${S.state.version || '?'} - Check for updates`)),
+    hr(),
+    h('p', null, h('b', null, 'Favorites '), favs.size ? [...favs].map((a) => h('span', { style: { marginRight: '6px' } }, teamLogo(a, 26))) : h('small', null, 'none yet \u2013 star a team in the banner')),
+  ];
+}
+
+function dataTab() {
+  return [
+    ratingsPanel(),
+    hr(),
+    h('p', null, h('b', null, 'Data cache '), h('small', null, S.state.cacheDir || '(dev preview)')),
+    syncPanel(),
+  ];
+}
+
+function syncTab() {
+  return [nightlyPanel(), hr(), timingPanel()];
+}
+
 export function openSettings() {
   overlay((close) => {
-    const s = S.state.settings;
-    const sync = S.state.sync;
-    const favs = S.favSet();
+    const body = h('div', { class: 'settings-body', role: 'tabpanel' });
+    const tabs = h('div', { class: 'seg settings-tabs', role: 'tablist', 'aria-label': 'Settings sections' });
+    const paint = () => {
+      tabs.replaceChildren(...[['general', 'General'], ['data', 'Data'], ['sync', 'Sync']].map(([k, label]) => h('button', {
+        type: 'button', role: 'tab', 'aria-selected': settingsTab === k ? 'true' : 'false', class: settingsTab === k ? 'active' : '',
+        onclick: () => { settingsTab = k; try { localStorage.setItem(TAB_KEY, k); } catch (e) { /* ignore */ } paint(); } }, label)));
+      body.replaceChildren(...(settingsTab === 'data' ? dataTab() : settingsTab === 'sync' ? syncTab() : generalTab(close, paint)));
+    };
+    paint();
     return h('div', null,
       h('h2', null, 'Settings'),
-      h('p', null, h('b', null, 'Theme '),
-        ['system', 'light', 'dark'].map((t) => h('button', { class: `btn ${s.theme === t ? 'primary' : ''}`, type: 'button', style: { marginRight: '6px' }, onclick: () => { S.saveSettings({ theme: t }); close(); } }, t))),
-      h('p', null, h('label', null, h('input', { type: 'checkbox', checked: s.updateCheck !== false ? true : null, onchange: (e) => S.saveSettings({ updateCheck: e.target.checked }) }),
-        ' Check GitHub for a new version when the app starts '), h('button', { class: 'btn', type: 'button', style: { marginLeft: '8px' }, onclick: () => { close(); openUpdate(); } }, `v${S.state.version || '?'} - Check for updates`)),
-      ratingsPanel(),
-      h('p', null, h('b', null, 'Favorites '), favs.size ? [...favs].map((a) => h('span', { style: { marginRight: '6px' } }, teamLogo(a, 26))) : h('small', null, 'none yet – star a team in the banner')),
-      h('hr', { style: { border: 0, borderTop: '1px solid var(--line)' } }),
-      h('p', null, h('b', null, 'Data cache '), h('small', null, S.state.cacheDir || '(dev preview)')),
-      syncPanel(),
-      h('hr', { style: { border: 0, borderTop: '1px solid var(--line)' } }),
-      nightlyPanel(),
-      h('hr', { style: { border: 0, borderTop: '1px solid var(--line)' } }),
-      timingPanel(),
+      tabs,
+      body,
       h('p', { style: { textAlign: 'right' } }, h('button', { class: 'btn primary', type: 'button', onclick: close }, 'Done')));
   });
 }
+
 void displayCode;
 
 // Nightly sync: a Windows scheduled task (current user, no admin rights) that runs the cache sync at a time the person picks.
@@ -97,7 +127,7 @@ function timingPanel() {
       const go = h('button', { class: 'btn primary', type: 'button', disabled: true, onclick: () => { S.saveSettings({ autoRefresh: true }); confirming = false; paint(); } }, 'Turn on automatic refresh');
       ack.addEventListener('change', () => { go.disabled = !ack.checked; });
       box.replaceChildren(
-        h('p', null, h('b', null, 'Data refresh: manual '), h('small', null, 'NBADash only contacts ESPN when you press the refresh button (top right, or F5), open a box score, or run a sync above.')),
+        h('p', null, h('b', null, 'Data refresh: manual '), h('small', null, 'NBADash only contacts ESPN when you press the refresh button (top right, or F5), open a box score, or run a sync from the Data tab.')),
         confirming
           ? h('div', { class: 'card pad warn' },
               h('b', null, 'Before you turn this on'),
@@ -128,6 +158,7 @@ function timingPanel() {
   paint();
   return box;
 }
+
 
 // Which possession formula the team ratings (ORtg, DRtg, Net) use.
 function ratingsPanel() {

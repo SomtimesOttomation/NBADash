@@ -37,6 +37,9 @@ const DEFS = {
     why: 'Points allowed per 100 possessions. Lower is better.', note: methodLine(),
   }),
   net: () => ({ title: 'Net Rating', formula: 'Net = ORtg − DRtg', why: 'How many points per 100 possessions a team outscores opponents by. The single best quick measure of how good a team has been.', note: methodLine() }),
+  pace: () => ({ title: 'Pace', formula: `Pace = 48 \u00d7 Poss / (Team minutes \u00f7 5)\n\n${POSS[method()]}`, why: 'Possessions per 48 minutes: how fast a team plays. Neither fast nor slow is better on its own; it explains why points per game can mislead. Dividing team minutes by 5 keeps overtime games from inflating it.', note: methodLine() }),
+  srs: () => ({ title: 'Simple Rating System (SRS)', formula: 'SRS = Point differential + SOS\nSOS = average SRS of the opponents faced\n(repeated until the numbers settle; league average = 0)', why: 'Basketball-Reference\u2019s rating: how many points better than an average team, adjusted for who you played. +5 means about 5 points better than average per game.' }),
+  sos: () => ({ title: 'Strength of Schedule (SOS)', formula: 'SOS = average SRS of the opponents faced', why: 'Positive means a tougher-than-average schedule so far. Early in the season a few games against good or bad teams swing it a lot.' }),
   diff: () => ({ title: 'Point Differential', formula: 'Diff = (Points − Points allowed) / Games', why: 'Average winning (or losing) margin. Simple, but fast-paced games inflate it; Net Rating corrects for pace.' }),
   efg: () => ({ title: 'Effective FG%', formula: 'eFG% = (FGM + 0.5 × 3PM) / FGA', why: 'Field goal percentage that gives a made three the 1.5× credit it earns in points. The most important of the Four Factors.' }),
   eff: () => ({ title: 'Efficiency (EFF)', formula: 'EFF = (PTS + REB + AST + STL + BLK − missed FG − missed FT − TOV) / Games', why: 'The NBA’s classic all-in-one box score number. Easy to read; rewards volume more than shooting efficiency.' }),
@@ -46,8 +49,8 @@ const DEFS = {
   gamescore: () => ({ title: 'Game Score', formula: 'GmSc = PTS + 0.4×FGM − 0.7×FGA − 0.4×(FTA − FTM) + 0.7×ORB + 0.3×DRB + STL + 0.7×AST + 0.7×BLK − 0.4×PF − TOV', why: 'John Hollinger’s single-game rating, used to pick Player of the Game. Around 10 is average, 40 is a great night.' }),
   grade: () => ({
     title: 'Report Card grade',
-    formula: 'Overall = 30% Net Rating + 35% Offense + 35% Defense\nOffense = 20% ORtg + 32% eFG% + 20% TOV% + 16% ORB% + 12% FT rate\nDefense = same five, for what opponents did',
-    why: 'Each input is turned into a percentile against the other teams, then weighted. The weights follow Dean Oliver’s Four Factors (shooting matters most). Grades are a curve: roughly the top 10% get an A. Teams with more games get a small edge.', note: methodLine(),
+    formula: 'Overall = 30% SRS + 35% Offense + 35% Defense\nOffense = 20% ORtg + 32% eFG% + 20% TOV% + 16% ORB% + 12% FT rate\nDefense = same five, for what opponents did',
+    why: 'Each input is turned into a percentile against the other teams, then weighted. SRS is the point differential adjusted for strength of schedule, so a team isn\u2019t marked down for facing good opponents. The weights follow Dean Oliver’s Four Factors (shooting matters most). Grades are a curve: roughly the top 10% get an A. Teams with more games get a small edge.', note: methodLine(),
   }),
   gpedge: () => ({ title: 'Games-played edge', formula: 'Ranked value = (GP × value + 0.5 × league average) / (GP + 0.5)', why: 'Pulls each number slightly toward the average, as if half an average game were added. Breaks near-ties in favor of bigger samples; fades as the season goes on. The number shown is unchanged.' }),
 };

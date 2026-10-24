@@ -39,11 +39,11 @@ const gradeBadge = (g) => h('span', { class: gcls(g) }, g);
 function reportTable(rep) {
   const f1 = (v) => v.toFixed(1), sg = (v) => (v > 0 ? '+' : '') + v.toFixed(1);
   return h('div', { class: 'card tr-wrap' }, h('table', { class: 'tr-table' },
-    h('thead', null, h('tr', null, [['#'], ['Team'], ['Overall', 'grade'], ['Offense', 'grade'], ['Defense', 'grade'], ['Net', 'net'], ['ORtg', 'ortg'], ['DRtg', 'drtg'], ['eFG%', 'efg'], ['GP']].map(([t, k], i) => h('th', { class: i > 1 ? 'num' : '' }, k ? h('span', calc(k, 'team'), t) : t)))),
+    h('thead', null, h('tr', null, [['#'], ['Team'], ['Overall', 'grade'], ['Offense', 'grade'], ['Defense', 'grade'], ['Net', 'net'], ['SRS', 'srs'], ['ORtg', 'ortg'], ['DRtg', 'drtg'], ['eFG%', 'efg'], ['GP']].map(([t, k], i) => h('th', { class: i > 1 ? 'num' : '' }, k ? h('span', calc(k, 'team'), t) : t)))),
     h('tbody', null, rep.map((r) => h('tr', null,
       h('td', { class: 'rk' }, r.overall.rank), h('td', null, teamCell(r.abbr)),
       h('td', { class: 'num' }, gradeBadge(r.overall.grade)), h('td', { class: 'num' }, gradeBadge(r.offGrade)), h('td', { class: 'num' }, gradeBadge(r.defGrade)),
-      h('td', { class: 'num' }, sg(r.net)), h('td', { class: 'num' }, f1(r.ortg)), h('td', { class: 'num' }, f1(r.drtg)), h('td', { class: 'num' }, f1(r.efg)), h('td', { class: 'num' }, r.games))))));
+      h('td', { class: 'num' }, sg(r.net)), h('td', { class: 'num' }, sg(r.srs)), h('td', { class: 'num' }, f1(r.ortg)), h('td', { class: 'num' }, f1(r.drtg)), h('td', { class: 'num' }, f1(r.efg)), h('td', { class: 'num' }, r.games))))));
 }
 
 // "counted in 40 of 52 games" for the Native formula (older saves fall back to the estimate)
@@ -67,7 +67,7 @@ function draw({ el }) {
 
   let body;
   if (!lg || (!games && L.loading)) body = emptyState('Building team stats…', L.total ? `${L.n} of ${L.total} box scores` : '');
-  else if (!games) body = emptyState('No saved box scores yet', 'Team rankings are built from saved box scores. Run Update everything in Settings.');
+  else if (!games) body = emptyState('No saved box scores yet', 'Team rankings are built from saved box scores. Run Update everything in Settings > Data.');
   else {
     const method = S.state.settings.ratingMethod || 'native';
     if (memo.rev !== L.rev || memo.method !== method || !memo.rows) memo = { rev: L.rev, method, rows: teamRows(lg, method), report: null };
@@ -91,7 +91,7 @@ function draw({ el }) {
     } else {
       const cards = teamCards(memo.rows, tab === 'losers', 5);
       body = h('div', null, h('p', { class: 'muted', style: { margin: '0 0 12px' } },
-        tab === 'losers' ? 'The five worst teams per category, the mirror image of Leaders. ' : 'Top 5 teams per category. ', 'Teams with more games played get a ', h('span', calc('gpedge'), 'small edge'), ` in close races. Ratings are points per 100 possessions (formula: ${RATING_METHODS[method]}${method === 'native' ? nativeShare(memo.rows) : ''}; change it in Settings). Hover a category name for its formula.`,
+        tab === 'losers' ? 'The five worst teams per category, the mirror image of Leaders. ' : 'Top 5 teams per category. ', 'Teams with more games played get a ', h('span', calc('gpedge'), 'small edge'), ` in close races. Ratings are points per 100 possessions (formula: ${RATING_METHODS[method]}${method === 'native' ? nativeShare(memo.rows) : ''}; change it in Settings > Data). Hover a category name for its formula.`,
         L.loading ? ` Updating… ${L.n} of ${L.total} new box scores.` : ''), cardGrid(cards));
     }
   }

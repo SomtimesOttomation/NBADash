@@ -20,8 +20,10 @@ export function teamRows(lg, method = 'native') {
     const P = teamPoss(t, method);
     if (!(P.o > 0) || !(P.d > 0)) continue;
     const ortg = (100 * T.pts) / P.o, drtg = (100 * O.pts) / P.d;
+    const teamMin = T.min > 0 ? T.min : games * 240;
     rows.push({
-      abbr, games, poss: P.o / games, counted: P.counted,
+      abbr, games, poss: P.o / games, counted: P.counted, opp: t.opp || {},
+      pace: (48 * ((P.o + P.d) / 2)) / (teamMin / 5),
       ppg: T.pts / games, oppg: O.pts / games, diff: (T.pts - O.pts) / games,
       ortg, drtg, net: ortg - drtg,
       fgp: 100 * rate(T.fgm, T.fga), tpp: 100 * rate(T.tpm, T.tpa), ftp: 100 * rate(T.ftm, T.fta),
@@ -36,7 +38,27 @@ export function teamRows(lg, method = 'native') {
       },
     });
   }
+  addSrs(rows);
   return rows;
+}
+
+// Simple Rating System (Basketball-Reference): average margin adjusted for the strength of the opponents faced.
+// SRS = MOV + SOS, where SOS is the average SRS of the opponents; solved by repeating until the numbers settle.
+function addSrs(rows) {
+  const by = new Map(rows.map((r) => [r.abbr, r]));
+  rows.forEach((r) => { r.srs = r.diff; r.sos = 0; });
+  for (let it = 0; it < 200; it++) {
+    let moved = 0;
+    const next = rows.map((r) => {
+      let w = 0, sum = 0;
+      for (const [o, n] of Object.entries(r.opp)) { const x = by.get(o); if (x) { sum += n * x.srs; w += n; } }
+      const sos = w ? sum / w : 0;
+      return { r, sos, srs: r.diff + sos };
+    });
+    const mean = next.reduce((a, x) => a + x.srs, 0) / (next.length || 1);
+    next.forEach((x) => { const v = x.srs - mean; moved = Math.max(moved, Math.abs(v - x.r.srs)); x.r.srs = v; x.r.sos = x.sos - mean; });
+    if (moved < 1e-6) break;
+  }
 }
 
 // [key, title, loser title, unit, decimals, suffix, signed, lowerIsBetter]
@@ -47,6 +69,8 @@ export const TEAM_DEFS = [
   ['ortg', 'Offensive Rating', 'Worst Offensive Rating', 'pts / 100 poss', 1, '', false, false],
   ['drtg', 'Defensive Rating', 'Worst Defensive Rating', 'lower is better', 1, '', false, true],
   ['net', 'Net Rating', 'Worst Net Rating', 'per 100 poss', 1, '', true, false],
+  ['srs', 'Simple Rating System', 'Worst SRS', 'margin + schedule', 1, '', true, false],
+  ['sos', 'Toughest Schedule', 'Easiest Schedule', 'strength of schedule', 1, '', true, false],
   ['efg', 'Effective FG%', 'Worst Effective FG%', 'eFG%', 1, '%', false, false],
   ['fgp', 'Field Goal %', 'Worst Field Goal %', 'FG%', 1, '%', false, false],
   ['tpp', '3-Point %', 'Worst 3-Point %', '3P%', 1, '%', false, false],
@@ -84,7 +108,7 @@ function pctile(rows, get0, low) {
 
 // Share of the league each grade covers, best to worst (a curve: grades are relative to the other 29 teams).
 const BANDS = [[0.10, 'A'], [0.20, 'A-'], [0.30, 'B+'], [0.43, 'B'], [0.57, 'B-'], [0.70, 'C+'], [0.80, 'C'], [0.90, 'C-'], [0.97, 'D'], [1.0, 'F']];
-export const GRADE_WEIGHTS = { net: 0.30, offense: 0.35, defense: 0.35, offenseParts: { ortg: 0.20, eFG: 0.32, tov: 0.20, reb: 0.16, ft: 0.12 }, defenseParts: { drtg: 0.20, eFG: 0.32, tov: 0.20, reb: 0.16, ft: 0.12 } };
+export const GRADE_WEIGHTS = { srs: 0.30, offense: 0.35, defense: 0.35, offenseParts: { ortg: 0.20, eFG: 0.32, tov: 0.20, reb: 0.16, ft: 0.12 }, defenseParts: { drtg: 0.20, eFG: 0.32, tov: 0.20, reb: 0.16, ft: 0.12 } };
 
 function gradesFor(scoreByAbbr) {
   const ordered = [...scoreByAbbr.entries()].sort((a, b) => b[1] - a[1]);
@@ -96,7 +120,7 @@ function gradesFor(scoreByAbbr) {
 export function reportCard(rows) {
   if (!rows.length) return [];
   const P = {
-    net: pctile(rows, (r) => r.net, false),
+    srs: pctile(rows, (r) => r.srs, false),   // schedule-adjusted margin, so a hard early schedule isn't punished
     ortg: pctile(rows, (r) => r.ortg, false), drtg: pctile(rows, (r) => r.drtg, true),
     oEfg: pctile(rows, (r) => r.f.oEfg, false), oTov: pctile(rows, (r) => r.f.oTov, true), oOrb: pctile(rows, (r) => r.f.oOrb, false), oFtr: pctile(rows, (r) => r.f.oFtr, false),
     dEfg: pctile(rows, (r) => r.f.dEfg, true), dTov: pctile(rows, (r) => r.f.dTov, false), dDrb: pctile(rows, (r) => r.f.dDrb, false), dFtr: pctile(rows, (r) => r.f.dFtr, true),
@@ -108,7 +132,7 @@ export function reportCard(rows) {
     const o = op.ortg * P.ortg.get(a) + op.eFG * P.oEfg.get(a) + op.tov * P.oTov.get(a) + op.reb * P.oOrb.get(a) + op.ft * P.oFtr.get(a);
     const d = dp.drtg * P.drtg.get(a) + dp.eFG * P.dEfg.get(a) + dp.tov * P.dTov.get(a) + dp.reb * P.dDrb.get(a) + dp.ft * P.dFtr.get(a);
     off.set(a, o); def.set(a, d);
-    all.set(a, W.net * P.net.get(a) + W.offense * o + W.defense * d);
+    all.set(a, W.srs * P.srs.get(a) + W.offense * o + W.defense * d);
   }
   const gAll = gradesFor(all), gOff = gradesFor(off), gDef = gradesFor(def);
   return rows.map((r) => ({ ...r, overall: gAll.get(r.abbr), offGrade: gOff.get(r.abbr).grade, defGrade: gDef.get(r.abbr).grade, score: all.get(r.abbr) }))
