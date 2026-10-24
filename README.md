@@ -49,6 +49,10 @@ The Team Rankings tab ranks all 30 teams per category (Leaders and Losers tabs):
 
 The Report Card tab gives each team an overall, offense and defense letter grade, curved against the rest of the league. Grades stay hidden until Week 3 is complete (from Nov 10); tick "Show grades anyway" to preview them early.
 
+## Transactions
+
+The Transactions tab (and a Transactions tab on each team page) lists trades, signings and waivers/releases. They are worked out by comparing saved rosters from one sync to the next, so no extra data is downloaded. Tracking starts from the first sync after updating; dates are the day a change was picked up, and a player who left a team is marked released only once every roster has been re-checked. Players who joined a team in the last 14 days get a New tag on the roster.
+
 ## Live game cards
 
 Live cards show the status ("Q2 5:14", "HALFTIME", "END Q1"). Once a box score has been loaded for a live game (the "Box score" button on the card, or auto-watch in automatic mode), the card also shows the latest basket: points and type (3PT, 2PT, FT), who scored, and when. It comes from the play-by-play that already ships with the box score, so it costs no extra request. ESPN does not flag timeouts or commercial breaks, only halftime and the end of a period.
