@@ -12,6 +12,8 @@ param(
     [Parameter(Mandatory)][string]$StageDir,
     [Parameter(Mandatory)][string]$WorkDir,
     [Parameter(Mandatory)][int]$ParentPid,
+    [string]$Relaunch = '',            # what to start afterwards (Context.Relaunch): the dash's own .bat, or a DashLauncher command line
+    [string]$RelaunchB64 = '',         # the same, base64 (UTF-8), so quotes and arguments survive the trip unchanged
     [Parameter(Mandatory)][string]$OldVersion,
     [Parameter(Mandatory)][string]$NewVersion,
     [int]$OkWaitSeconds = 60
@@ -20,6 +22,17 @@ param(
 $ErrorActionPreference = 'Stop'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 $AppDir = [IO.Path]::GetFullPath($AppDir).TrimEnd('\', '/')
+if ($RelaunchB64) { try { $Relaunch = $utf8.GetString([Convert]::FromBase64String($RelaunchB64)) } catch { $Relaunch = '' } }
+if (-not $Relaunch) { $Relaunch = '"' + (Join-Path $AppDir 'Start-NBADash.bat') + '"' }
+# Context.Relaunch is run exactly as given and may carry arguments, e.g.  "C:\Apps\DashLauncher\Start-DashLauncher.bat" -Open nbadash
+# Split it only to find the .bat (for the working folder and for spotting a stuck copy during rollback).
+$Relaunch = $Relaunch.Trim()
+if ($Relaunch -match '^"([^"]+)"\s*(.*)$') { $relaunchFile = $Matches[1]; $relaunchArgs = $Matches[2] }
+elseif ($Relaunch -match '^(.+?\.(?:bat|cmd))(?:\s+(.*))?$') { $relaunchFile = $Matches[1]; $relaunchArgs = [string]$Matches[2] }
+else { $relaunchFile = $Relaunch; $relaunchArgs = '' }
+$relaunchFile = [IO.Path]::GetFullPath($relaunchFile)
+$relaunchDir = Split-Path $relaunchFile
+$relaunchScript = [IO.Path]::GetFileNameWithoutExtension($relaunchFile) + '.ps1'
 $StageDir = [IO.Path]::GetFullPath($StageDir).TrimEnd('\', '/')
 $logFile = Join-Path $WorkDir 'apply.log'
 $backupRoot = Join-Path $WorkDir 'backup'
@@ -62,10 +75,12 @@ function Restore-Backup {
 }
 
 function Start-App {
-    # Same launcher the user double-clicks: it re-checks lib\ and starts the hidden PowerShell host.
+    # Same entry point the person double-clicks (the dash's .bat, or DashLauncher's): it re-checks lib\ and starts the hidden host.
     $extra = @{}
     if ($PSVersionTable.PSEdition -ne 'Core' -or $IsWindows) { $extra.WindowStyle = 'Hidden' }     # (PowerShell 7 on Linux has no such switch: test runs only)
-    Start-Process -FilePath $env:ComSpec -ArgumentList '/c', ('"{0}"' -f (Join-Path $AppDir 'Start-NBADash.bat')) -WorkingDirectory $AppDir @extra
+    # cmd /c ""file.bat" args": the outer quotes keep cmd from stripping the inner ones when the path has spaces
+    $line = ('"{0}"' -f $relaunchFile) + $(if ($relaunchArgs) { ' ' + $relaunchArgs } else { '' })
+    Start-Process -FilePath $env:ComSpec -ArgumentList '/c', ('"{0}"' -f $line) -WorkingDirectory $relaunchDir @extra
 }
 
 function Stop-App {
@@ -73,7 +88,7 @@ function Stop-App {
     try {
         $mine = $PID
         Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object {
-            $_.ProcessId -ne $mine -and $_.CommandLine -and $_.CommandLine -like "*$AppDir*Start-NBADash.ps1*"
+            $_.ProcessId -ne $mine -and $_.CommandLine -and ($_.CommandLine -like "*$AppDir*Start-NBADash.ps1*" -or $_.CommandLine -like "*$relaunchDir*$relaunchScript*")
         } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     } catch { }
 }

@@ -24,6 +24,9 @@ function New-NbaShared {
         Watch = [hashtable]::Synchronized(@{})
         Traffic = $traffic
         Stop = $false; RefreshNow = $false
+        # Paused: tab hidden (launcher) - no timed fetching, queued one-off requests still run.
+        # Halted: kill switch - nothing runs until the person resumes. LiveCount: games in progress, for the host's status.
+        Paused = $false; Halted = $false; LiveCount = 0
     })
 }
 
@@ -372,8 +375,15 @@ function Invoke-NbaWorker {
     while (-not $Shared.Stop) {
         try {
             $now = [DateTime]::UtcNow
+            if ($Shared.Halted) {
+                # kill switch: drop anything queued and fetch nothing until the person resumes
+                $drop = $null; while ($Shared.Commands.TryDequeue([ref]$drop)) { }
+                $Shared.RefreshNow = $false
+                Start-Sleep -Milliseconds 500
+                continue
+            }
             $force = [bool]$Shared.RefreshNow
-            $auto = [bool]$Shared.Auto
+            $auto = [bool]$Shared.Auto -and -not $Shared.Paused     # paused (hidden tab): one-off requests only
             $Shared.RefreshNow = $false
             $live = [Math]::Max(10, [int]$Shared.LiveSeconds)
 
@@ -436,6 +446,8 @@ function Invoke-NbaWorker {
                     Save-NbaJsonFile $sbPath $copy
                 }
             }
+
+            $Shared.LiveCount = @($known.Values | Where-Object { $_.state -eq 'in' }).Count
 
             # box scores for watched / requested games
             $want = @(if ($auto) { $Shared.Watch.Keys }) + @($box.Keys | Where-Object { $box[$_].oneShot })

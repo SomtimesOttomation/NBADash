@@ -7,7 +7,9 @@ Windows PowerShell 5.1 + WebView2. No installer, no admin rights, no build step.
 
 ```
 Start-NBADash.bat          checks lib\ (WebView2 DLLs), starts the hidden PowerShell host
-Start-NBADash.ps1          the host: WinForms window + WebView2, command bridge, timers, child processes
+Start-NBADash.ps1          thin host: WinForms window + WebView2, virtual hosts, navigation lock, 250 ms event timer
+modules\NBADash.Host.psm1  the backend (dash contract): settings, command bridge, worker, child processes, host lock
+dash.json                  manifest DashLauncher reads to show NBA Dash as a tab
 modules\Nba.Data.psm1      worker runspace: fetches live data, converts it to compact models, pushes events
 Sync-NBACache.ps1          child process: bulk cache sync (teams, rosters, standings, scoreboards, box scores)
 Update-NBADash.ps1        child process: checks GitHub releases, downloads + verifies an update
@@ -23,7 +25,7 @@ page through a virtual host) or an **event** pushed by the worker.
 
 - The page calls `bridge.request(cmd, args)`; the host replies `{id, ok, data|error}`.
 - The host pushes `{event, data}` messages (scoreboard, box, live, sync, standings, injuries, update, player, psearch).
-- Commands are a `switch` in `Invoke-Command2`. Every argument is validated (ids are digits, modes are whitelisted,
+- Commands are a `switch` behind `Invoke-DashCommand` in `modules\NBADash.Host.psm1`. Every argument is validated (ids are digits, modes are whitelisted,
   file names come from an allow-list). The page is treated as untrusted input.
 - A dev mock (`ui\dev\mock.js`) implements the same commands so the UI runs in a normal browser for testing.
 
@@ -70,12 +72,11 @@ The app bundles no third-party data; it fetches on the user's machine and caches
 Host window and bridge, worker/queue pattern, sync child-process pattern, settings and risk-acknowledgement UI,
 nightly-task registration, updater and release workflow, store/router/components, dev mock, test approach.
 
-## Ideas for a multi-sport launcher
+## Multi-sport launcher
 
-- Core + one folder per sport module (`ui`, data module, sync script, manifest with id/name/icon/version).
-- Standalone: start a single module. Launcher: a left icon rail loads the selected module's UI from its own virtual host;
-  only the visible module's worker runs, which keeps background requests to a minimum.
-- Per-module versions with a shared core version.
+NBA Dash follows DashLauncher's dash contract: see
+[DASH-CONTRACT.md](https://github.com/SomtimesOttomation/DashLauncher/blob/main/DASH-CONTRACT.md) in the DashLauncher
+repo. Standalone, `Start-NBADash.ps1` is the host; inside DashLauncher, the launcher is.
 
 ## PowerShell 5.1 gotchas learned
 

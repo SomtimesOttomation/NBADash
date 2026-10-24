@@ -28,8 +28,10 @@ function generalTab(close, repaint) {
   const s = S.state.settings;
   const favs = S.favSet();
   return [
-    h('p', null, h('b', null, 'Theme '),
-      [['system', 'System'], ['light', 'Light'], ['dark', 'Dark']].map(([t, label]) => h('button', { class: `btn ${s.theme === t ? 'primary' : ''}`, type: 'button', style: { marginRight: '6px' }, onclick: () => { S.saveSettings({ theme: t }); repaint(); } }, label))),
+    S.inLauncher()
+      ? h('p', null, h('b', null, 'Theme '), h('small', null, 'Follows DashLauncher.'))
+      : h('p', null, h('b', null, 'Theme '),
+        [['system', 'System'], ['light', 'Light'], ['dark', 'Dark']].map(([t, label]) => h('button', { class: `btn ${s.theme === t ? 'primary' : ''}`, type: 'button', style: { marginRight: '6px' }, onclick: () => { S.saveSettings({ theme: t }); repaint(); } }, label))),
     hr(),
     h('p', null, h('b', null, 'Check for Updates')),
     h('p', null, h('label', null, h('input', { type: 'checkbox', checked: s.updateCheck !== false ? true : null, onchange: (e) => S.saveSettings({ updateCheck: e.target.checked }) }),

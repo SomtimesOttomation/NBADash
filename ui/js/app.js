@@ -105,6 +105,15 @@ $('#btn-theme').addEventListener('click', () => {
 $('#btn-settings').addEventListener('click', openSettings);
 $('#btn-version').addEventListener('click', openUpdate);
 
+// Kill switch (DashLauncher): a bar until the person resumes.
+function haltBar() {
+  const b = $('#haltbar');
+  b.hidden = !S.state.halted;
+  if (!S.state.halted) { b.replaceChildren(); return; }
+  b.replaceChildren(h('span', null, 'Traffic stopped. NBA Dash will not contact ESPN or GitHub until you resume.'),
+    h('button', { class: 'btn primary', type: 'button', onclick: () => S.resumeTraffic().catch((e) => toast(e.message)) }, 'Resume'));
+}
+
 function versionChip() {
   const b = $('#btn-version'), u = S.state.update;
   b.textContent = S.state.version ? `v${S.state.version}` : '';
@@ -121,6 +130,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'F5') { e.preventDef
 
 S.subscribe((topics) => {
   if (topics.has('theme') || topics.has('settings')) themeIcon();
+  if (topics.has('traffic')) haltBar();
   if (topics.has('settings')) liveStatus();
   if (topics.has('teams') || topics.has('favorites')) renderBanner($('#banner'), location.hash.startsWith('#/team/') ? decodeURIComponent(location.hash.slice(7)) : '');
   if (topics.has('days')) renderWeekBar($('#weekbar'), location.hash.startsWith('#/week/') ? +location.hash.slice(7) : 0);
@@ -134,6 +144,8 @@ setInterval(liveStatus, 15000);
 
 window.addEventListener('hashchange', route);
 S.init().then(() => {
+  if (S.inLauncher()) $('#btn-theme').hidden = true;      // the launcher owns the theme
+  haltBar();
   themeIcon(); liveStatus(); route(); versionChip(); initPlayerSearch(); renderCompareBar($('#cmpbar')); installCalcTips();
   const n = S.state.update.note;
   if (n) toast(n.ok ? `Updated to v${n.to}.` : `The update to v${n.to} did not work (${n.reason || 'unknown reason'}). v${n.from} was restored.`);
