@@ -381,10 +381,12 @@ function Invoke-PageCommand {
             if (-not (Test-Path $runDir)) { New-Item -ItemType Directory -Path $runDir -Force | Out-Null }
             $helper = Join-Path $runDir 'Apply-Update.ps1'
             Copy-Item (Join-Path $script:Root 'Apply-Update.ps1') $helper -Force
-            $relaunch = if ($script:Ctx.Relaunch) { [string]$script:Ctx.Relaunch } else { Join-Path $script:Root 'Start-NBADash.bat' }
+            # Context.Relaunch is passed through exactly as given (it may include arguments, e.g. -Open nbadash)
+            $relaunch = if ($script:Ctx.Relaunch) { [string]$script:Ctx.Relaunch } else { '"' + (Join-Path $script:Root 'Start-NBADash.bat') + '"' }
+            $relaunchB64 = [Convert]::ToBase64String($utf8.GetBytes($relaunch))
             $hostPid = if ($script:Ctx.HostPid) { [int]$script:Ctx.HostPid } else { $PID }
             $h = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f $helper), '-AppDir', ('"{0}"' -f $script:Root), '-StageDir', ('"{0}"' -f $stage),
-                   '-WorkDir', ('"{0}"' -f $script:UpdDir), '-ParentPid', [string]$hostPid, '-Relaunch', ('"{0}"' -f $relaunch),
+                   '-WorkDir', ('"{0}"' -f $script:UpdDir), '-ParentPid', [string]$hostPid, '-RelaunchB64', $relaunchB64,
                    '-OldVersion', $script:Version, '-NewVersion', [string]$st.version)
             Start-Process -FilePath 'powershell.exe' -ArgumentList $h -WindowStyle Hidden | Out-Null
             Reply $Msg.id 'true'
