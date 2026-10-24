@@ -91,7 +91,7 @@ function draw({ el }) {
     } else {
       const cards = teamCards(memo.rows, tab === 'losers', 5);
       body = h('div', null, h('p', { class: 'muted', style: { margin: '0 0 12px' } },
-        tab === 'losers' ? 'The five worst teams per category, the mirror image of Leaders. ' : 'Top 5 teams per category. ', 'Teams with more games played get a ', h('span', calc('gpedge'), 'small edge'), ` in close races. Ratings are points per 100 possessions (formula: ${RATING_METHODS[method]}${method === 'native' ? nativeShare(memo.rows) : ''}; change it in Settings). Hover a category name for its formula.`,
+        tab === 'losers' ? 'The five worst teams per category, the mirror image of Leaders. ' : 'Top 5 teams per category. ', 'Teams with more games played get a ', h('span', calc('gpedge'), 'small edge'), ` in close races. Ratings are points per 100 possessions (formula: ${RATING_METHODS[method]}${method === 'native' ? nativeShare(memo.rows) : ''}; change it in Settings > Data). Hover a category name for its formula.`,
         L.loading ? ` Updating… ${L.n} of ${L.total} new box scores.` : ''), cardGrid(cards));
     }
   }
