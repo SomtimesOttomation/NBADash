@@ -485,7 +485,8 @@ export async function loadLeague() {
       while (next < todo.length) {
         const id = todo[next++];
         const b = await readCache(`boxscores/${id}.json`);
-        if (b) { normBox(b); leagueAdd(data, b); }
+        // only count a box once it is readable and complete; otherwise try it again next time
+        if (b) { normBox(b); if (!leagueAdd(data, b)) { L.n++; continue; } } else { L.n++; continue; }
         data.done.push(id);
         L.n++;
         if (L.n % 10 === 0) { L.rev++; notify('league'); }

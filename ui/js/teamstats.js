@@ -1,6 +1,8 @@
 // Team-level numbers for the Team Rankings page: category leaders/losers and the Report Card grades.
 // Everything is computed from the league totals already built from saved box scores (lg.teams[abbr] = { games, T, O }).
 
+import { gpAdjust } from './stats.js';
+
 const rate = (n, d) => (d > 0 ? n / d : NaN);
 
 export function teamRows(lg) {
@@ -51,8 +53,9 @@ export const TEAM_DEFS = [
 
 export function teamCards(rows, worst, top = 5) {
   return TEAM_DEFS.map(([key, title, loserTitle, unit, f, suffix, signed, low]) => {
-    const list = rows.filter((r) => Number.isFinite(r[key]))
-      .sort((a, b) => ((low !== worst) ? a[key] - b[key] : b[key] - a[key]))
+    const pool = rows.filter((r) => Number.isFinite(r[key]));
+    const adj = gpAdjust(pool, (r) => r[key], (r) => r.games);   // small edge to teams with more games played
+    const list = pool.map((r) => ({ r, k: adj(r) })).sort((a, b) => ((low !== worst) ? a.k - b.k : b.k - a.k)).map((x) => x.r)
       .slice(0, top).map((r) => ({ abbr: r.abbr, value: r[key], sub: `${r.games} GP` }));
     return { key, title: worst ? loserTitle : title, unit, f, suffix, signed, rows: list };
   });
@@ -60,7 +63,8 @@ export function teamCards(rows, worst, top = 5) {
 
 // ---------------------------------------------------------------- Report Card
 // Percentile of a team on one measure among all teams (1 = best in the league, 0 = worst).
-function pctile(rows, get, low) {
+function pctile(rows, get0, low) {
+  const get = gpAdjust(rows, get0, (r) => r.games);   // same small edge for more games played
   const vals = rows.map((r) => ({ r, v: get(r) }));
   const out = new Map();
   for (const x of vals) {

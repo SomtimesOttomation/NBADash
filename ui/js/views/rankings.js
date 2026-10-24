@@ -82,7 +82,7 @@ function draw({ el }) {
     } else {
       const cards = teamCards(memo.rows, tab === 'losers', 5);
       body = h('div', null, h('p', { class: 'muted', style: { margin: '0 0 12px' } },
-        tab === 'losers' ? 'The five worst teams per category, the mirror image of Leaders.' : 'Top 5 teams per category. Ratings are points per 100 possessions (estimated); for allowed points and defensive rating, lower is better.',
+        tab === 'losers' ? 'The five worst teams per category, the mirror image of Leaders.' : 'Top 5 teams per category. Teams with more games played get a small edge in close races. Ratings are points per 100 possessions (estimated); for allowed points and defensive rating, lower is better.',
         L.loading ? ` Updating… ${L.n} of ${L.total} new box scores.` : ''), cardGrid(cards));
     }
   }
