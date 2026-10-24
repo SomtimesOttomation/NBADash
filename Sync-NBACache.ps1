@@ -9,6 +9,8 @@
 
     teams.json, logos\            team list, colors, logos
     teams\<ABBR>.json             roster, head coach, record, compact schedule
+    roster-snapshot.json          last seen roster per player (for transactions)
+    transactions.json             trades, signings and releases worked out from roster changes
     standings.json, injuries.json
     scoreboards\yyyyMMdd.json     every finished day since the last run
     boxscores\<eventId>.json      compact box score per finished game
@@ -293,6 +295,84 @@ foreach ($tm in $ordered) {
     })
     Write-Log ("  {0} players, {1} games" -f $players.Count, $games.Count)
 }
+
+# ---------------------------------------------------------------- 2b. transactions (worked out from roster changes, no extra requests)
+# Compares the saved rosters with the snapshot from the previous sync. A player who moves from one roster to another is a trade,
+# a new name is a signing, and a player who is on no roster once every team has been re-checked is waived / released.
+function Update-Transactions {
+    # timestamps compared as sortable text (newer PowerShell turns ISO strings in JSON into dates)
+    $ts = { param($v) if ($v -is [datetime]) { $v.ToString('s') } else { [string]$v } }
+    $snapPath = Join-Path $CacheDir 'roster-snapshot.json'
+    $txPath = Join-Path $CacheDir 'transactions.json'
+    $today = $et.ToString('yyyy-MM-dd')
+
+    # current rosters; a player on two files (one not refreshed yet) belongs to the newer file
+    $cur = @{}; $fileTimes = @()
+    foreach ($f in @(Get-ChildItem (Join-Path $CacheDir 'teams') -Filter *.json -File -ErrorAction SilentlyContinue)) {
+        $tf = $null; try { $tf = Get-Content $f.FullName -Raw | ConvertFrom-Json } catch { }
+        if (-not $tf -or -not $tf.abbr) { continue }
+        $at = & $ts $tf.syncedAt; $fileTimes += $at
+        foreach ($p in @($tf.players)) {
+            if (-not $p.id) { continue }
+            $id = [string]$p.id
+            if ($cur.ContainsKey($id) -and $cur[$id].at -ge $at) { continue }
+            $cur[$id] = @{ team = [string]$tf.abbr; name = [string]$p.name; pos = [string]$p.pos; at = $at }
+        }
+    }
+    if ($cur.Count -eq 0) { return }
+    $oldest = ($fileTimes | Sort-Object | Select-Object -First 1)
+
+    $snap = $null; if (Test-Path $snapPath) { try { $snap = Get-Content $snapPath -Raw | ConvertFrom-Json } catch { } }
+    $prev = @{}; $gone = @{}
+    if ($snap) {
+        foreach ($pr in @($snap.players.PSObject.Properties)) { $prev[$pr.Name] = @{ team = [string]$pr.Value.team; name = [string]$pr.Value.name; pos = [string]$pr.Value.pos } }
+        foreach ($pr in @($snap.gone.PSObject.Properties)) { $gone[$pr.Name] = @{ team = [string]$pr.Value.team; name = [string]$pr.Value.name; pos = [string]$pr.Value.pos; at = (& $ts $pr.Value.at) } }
+    }
+    $tx = $null; if (Test-Path $txPath) { try { $tx = Get-Content $txPath -Raw | ConvertFrom-Json } catch { } }
+    $events = New-Object System.Collections.ArrayList
+    if ($tx) { foreach ($e in @($tx.events)) { [void]$events.Add($e) } }
+    $add = { param($type, $id, $p, $from, $to)
+        [void]$events.Add([pscustomobject]@{ date = $today; type = $type; id = $id; name = $p.name; pos = $p.pos; from = $from; to = $to })
+        $script:txAdded++ }
+    $script:txAdded = 0
+
+    if ($snap) {
+        # a team seen for the first time (its roster was never saved before) is a starting point, not a wave of signings
+        $prevTeams = @{}; foreach ($v in $prev.Values) { $prevTeams[$v.team] = $true }
+        foreach ($v in $gone.Values) { $prevTeams[$v.team] = $true }
+        foreach ($id in $cur.Keys) {
+            $c = $cur[$id]
+            if ($prev.ContainsKey($id)) {
+                if ($prev[$id].team -ne $c.team) { & $add 'trade' $id $c $prev[$id].team $c.team }
+            } elseif ($gone.ContainsKey($id)) {
+                # left one roster earlier and turned up on another before every team was re-checked: still a move between teams
+                if ($gone[$id].team -ne $c.team) { & $add 'trade' $id $c $gone[$id].team $c.team }
+                $gone.Remove($id)
+            } elseif ($prevTeams.ContainsKey($c.team)) {
+                & $add 'signed' $id $c '' $c.team
+            }
+        }
+        foreach ($id in $prev.Keys) {
+            if (-not $cur.ContainsKey($id) -and -not $gone.ContainsKey($id)) { $gone[$id] = @{ team = $prev[$id].team; name = $prev[$id].name; pos = $prev[$id].pos; at = (Get-Date).ToString('s') } }
+        }
+        # released once every team's roster has been saved again since the player disappeared
+        foreach ($id in @($gone.Keys)) {
+            if ($oldest -and $oldest -gt $gone[$id].at) { & $add 'released' $id $gone[$id] $gone[$id].team ''; $gone.Remove($id) }
+        }
+    } else {
+        Write-Log 'Transactions: first roster snapshot saved; changes are tracked from the next sync'
+    }
+
+    $players = [ordered]@{}
+    foreach ($id in $cur.Keys) { $players[$id] = [pscustomobject]@{ team = $cur[$id].team; name = $cur[$id].name; pos = $cur[$id].pos } }
+    $goneOut = [ordered]@{}
+    foreach ($id in $gone.Keys) { $goneOut[$id] = [pscustomobject]$gone[$id] }
+    Save-Json $snapPath ([pscustomobject]@{ savedAt = (Get-Date).ToString('s'); players = [pscustomobject]$players; gone = [pscustomobject]$goneOut })
+    $keep = @($events | Select-Object -Last 3000)
+    Save-Json $txPath ([pscustomobject]@{ updatedAt = (Get-Date).ToString('s'); events = $keep })
+    if ($script:txAdded) { Write-Log ("Transactions: {0} new" -f $script:txAdded) }
+}
+if (-not $HistoryOnly) { try { Update-Transactions } catch { Write-Log ("Transactions: skipped ({0})" -f $_.Exception.Message) } }
 
 # ---------------------------------------------------------------- 3. standings
 $stPath = Join-Path $CacheDir 'standings.json'
