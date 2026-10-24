@@ -67,7 +67,7 @@ function draw({ el }) {
 
   let body;
   if (!lg || (!games && L.loading)) body = emptyState('Building team stats…', L.total ? `${L.n} of ${L.total} box scores` : '');
-  else if (!games) body = emptyState('No saved box scores yet', 'Team rankings are built from saved box scores. Run Update everything in Settings.');
+  else if (!games) body = emptyState('No saved box scores yet', 'Team rankings are built from saved box scores. Run Update everything in Settings > Data.');
   else {
     const method = S.state.settings.ratingMethod || 'native';
     if (memo.rev !== L.rev || memo.method !== method || !memo.rows) memo = { rev: L.rev, method, rows: teamRows(lg, method), report: null };

@@ -36,7 +36,7 @@ function draw({ el }) {
 
   let body;
   if (!lg || (!games && L.loading)) body = emptyState('Building league stats\u2026', L.total ? `${L.n} of ${L.total} box scores` : '');
-  else if (!games) body = emptyState('No saved box scores yet', 'League leaders are built from saved box scores. Run Update everything in Settings.');
+  else if (!games) body = emptyState('No saved box scores yet', 'League leaders are built from saved box scores. Run Update everything in Settings > Data.');
   else {
     if (memo.rev !== L.rev || memo.tab !== tab || !memo.cards) memo = { rev: L.rev, tab, cards: (tab === 'losers' ? leagueLosers : leagueLeaders)(lg, 5) };
     const note = h('p', { class: 'muted', style: { margin: '0 0 12px' } },

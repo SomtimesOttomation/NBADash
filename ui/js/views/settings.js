@@ -44,11 +44,12 @@ function dataTab() {
     ratingsPanel(),
     hr(),
     h('p', null, h('b', null, 'Data cache '), h('small', null, S.state.cacheDir || '(dev preview)')),
+    syncPanel(),
   ];
 }
 
 function syncTab() {
-  return [syncPanel(), hr(), nightlyPanel(), hr(), timingPanel()];
+  return [nightlyPanel(), hr(), timingPanel()];
 }
 
 export function openSettings() {
@@ -126,7 +127,7 @@ function timingPanel() {
       const go = h('button', { class: 'btn primary', type: 'button', disabled: true, onclick: () => { S.saveSettings({ autoRefresh: true }); confirming = false; paint(); } }, 'Turn on automatic refresh');
       ack.addEventListener('change', () => { go.disabled = !ack.checked; });
       box.replaceChildren(
-        h('p', null, h('b', null, 'Data refresh: manual '), h('small', null, 'NBADash only contacts ESPN when you press the refresh button (top right, or F5), open a box score, or run a sync above.')),
+        h('p', null, h('b', null, 'Data refresh: manual '), h('small', null, 'NBADash only contacts ESPN when you press the refresh button (top right, or F5), open a box score, or run a sync from the Data tab.')),
         confirming
           ? h('div', { class: 'card pad warn' },
               h('b', null, 'Before you turn this on'),
