@@ -177,11 +177,15 @@ export function rankAll(players, ctxFor, top, { minMpg = 8, minGpShare = 0, wors
 export function leaders(agg, top = 3) { return rankAll(agg.players, () => agg, top); }
 
 // ---------------------------------------------------------------- league-wide, built one saved box score at a time
-export const LEAGUE_VERSION = 1;
+export const LEAGUE_VERSION = 2;   // 2: rebuild once; boxes missing a team's player lines are no longer counted as done
 export const newLeague = () => ({ version: LEAGUE_VERSION, done: [], teams: {}, players: {} });
 
+// A box is usable once both teams have at least one player line with numbers in it.
+export const boxComplete = (box) => !!box && Array.isArray(box.teams) && box.teams.length === 2
+  && box.teams.every((t) => Array.isArray(t.players) && t.players.some((p) => played(p)));
+
 export function leagueAdd(lg, box) {
-  if (!box || !Array.isArray(box.teams) || box.teams.length !== 2) return;
+  if (!boxComplete(box)) return false;
   for (let i = 0; i < 2; i++) {
     const mine = box.teams[i], theirs = box.teams[1 - i];
     const te = lg.teams[mine.team] || (lg.teams[mine.team] = { games: 0, T: emptyTot(), O: emptyTot() });
@@ -201,6 +205,7 @@ export function leagueAdd(lg, box) {
       if (p.starter) e.gs++;
     }
   }
+  return true;
 }
 
 // League leaders: stricter than the team view (10+ minutes a game, and at least half of the team's games played).

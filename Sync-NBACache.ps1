@@ -338,6 +338,29 @@ if (-not $HistoryOnly -and -not (Test-Fresh $injPath $TableFreshHours)) {
     }
 }
 
+function Test-BoxComplete {
+    # A finished game's box score is only worth keeping when both teams have player lines with real numbers in them.
+    param($Teams)
+    $teams = @($Teams)
+    if ($teams.Count -ne 2) { return $false }
+    foreach ($t in $teams) {
+        $withStats = @($t.players | Where-Object { -not $_.dnp -and @($_.stats | Where-Object { $_ -ne '' -and $_ -ne '--' }).Count -gt 0 })
+        if ($withStats.Count -eq 0) { return $false }
+    }
+    return $true
+}
+
+function Test-BoxStale {
+    # Recently saved box scores are re-checked once (older ones were already settled): true when one is missing a team's player lines.
+    param([string]$Path)
+    try {
+        $fi = Get-Item $Path
+        if (((Get-Date) - $fi.LastWriteTime).TotalDays -gt 3) { return $false }
+        $b = Get-Content $Path -Raw | ConvertFrom-Json
+        return (-not (Test-BoxComplete $b.teams))
+    } catch { return $false }
+}
+
 function Save-BoxScore {
     # Downloads one finished game's summary and writes the compact box score. Returns $true when a file was saved.
     param([string]$Id, [string]$Date, [string]$Name)
@@ -368,6 +391,8 @@ function Save-BoxScore {
             stats = @($_.statistics | ForEach-Object { [pscustomobject]@{ name = $_.name; value = $_.displayValue } })
         }
     })
+    # ESPN sometimes posts a final game before one team's player stats are filled in: do not keep it, so the next sync tries again
+    if (-not (Test-BoxComplete $boxTeams)) { Write-Log ("  box score {0} not complete yet, will retry" -f $Id); return $false }
     Save-Json $bxPath ([pscustomobject]@{
         id = $Id; date = $Date; name = $Name
         venue = $sum.gameInfo.venue.fullName; city = $sum.gameInfo.venue.address.city
@@ -386,8 +411,10 @@ $boxCount = 0
 $boxMax = 0
 if ($Quick) { $boxMax = 3 }
 
-$totalDays = [Math]::Max(1, [int](($yday - $start).TotalDays) + 1)
-for ($day = $start; $day -le $yday; $day = $day.AddDays(1)) {
+# today is included so box scores of games that already finished tonight get saved; today is never marked complete
+$today = $et.Date
+$totalDays = [Math]::Max(1, [int](($today - $start).TotalDays) + 1)
+for ($day = $start; $day -le $today; $day = $day.AddDays(1)) {
     $ds = $day.ToString('yyyyMMdd')
     $dayPct = 78 + 20 * ([int](($day - $start).TotalDays)) / $totalDays
     Set-Progress $dayPct ('Games for ' + $day.ToString('MMM d'))
@@ -399,13 +426,13 @@ for ($day = $start; $day -le $yday; $day = $day.AddDays(1)) {
         if (-not $NoBoxes) {
             foreach ($cev in @($cached.events | Where-Object { $_.state -eq 'post' })) {
                 if ($boxMax -gt 0 -and $boxCount -ge $boxMax) { break }
-                if (Test-Path (Join-Path $CacheDir ("boxscores\" + $cev.id + '.json'))) { continue }
+                if ((Test-Path (Join-Path $CacheDir ("boxscores\" + $cev.id + '.json'))) -and -not (Test-BoxStale (Join-Path $CacheDir ("boxscores\" + $cev.id + '.json')))) { continue }
                 Set-Progress ($dayPct + 10 / $totalDays) ('Box score ' + $cev.name)
                 if (Save-BoxScore -Id ([string]$cev.id) -Date ([string]$cev.date) -Name ([string]$cev.name)) { $boxCount++; Write-Log ("  box score {0}: {1}" -f $cev.id, $cev.name) }
             }
         }
         Write-Log "Day ${ds}: already complete"
-        if (-not $blocked) { $lastComplete = $ds }
+        if (-not $blocked -and $day -le $yday) { $lastComplete = $ds }
         continue
     }
 
@@ -439,6 +466,7 @@ for ($day = $start; $day -le $yday; $day = $day.AddDays(1)) {
     }
     # a past day with no games (for example Election Day) counts as complete
     $allFinal = (@($events | Where-Object { $_.status.type.state -ne 'post' }).Count -eq 0)
+    if ($day -gt $yday -and @($events).Count -eq 0) { $allFinal = $false }
     Save-Json $sbPath ([pscustomobject]@{ date = $ds; allFinal = $allFinal; syncedAt = (Get-Date).ToString('s'); events = $evOut })
 
     # box scores for finished games
@@ -446,7 +474,7 @@ for ($day = $start; $day -le $yday; $day = $day.AddDays(1)) {
         if ($NoBoxes) { break }
         if ($boxMax -gt 0 -and $boxCount -ge $boxMax) { break }
         $bxPath = Join-Path $CacheDir ("boxscores\" + $ev.id + '.json')
-        if ((-not $Force) -and (Test-Path $bxPath)) { continue }
+        if ((-not $Force) -and (Test-Path $bxPath) -and -not (Test-BoxStale $bxPath)) { continue }
         Set-Progress ($dayPct + 10 / $totalDays) ('Box score ' + $ev.shortName)
         if (-not (Save-BoxScore -Id $ev.id -Date $ev.date -Name $ev.shortName)) { continue }
         $boxCount++
@@ -454,7 +482,7 @@ for ($day = $start; $day -le $yday; $day = $day.AddDays(1)) {
     }
 
     if ($anyLive -or -not $allFinal) { $blocked = $true; Write-Log "  Day $ds not complete yet (games still live or not final)" }
-    elseif (-not $blocked) { $lastComplete = $ds }
+    elseif (-not $blocked -and $day -le $yday) { $lastComplete = $ds }
 }
 
 # ---------------------------------------------------------------- state + traffic log
