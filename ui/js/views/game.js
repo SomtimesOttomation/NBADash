@@ -4,6 +4,7 @@ import { h, fmtKey, etKey } from '../util.js';
 import { displayCode } from '../arenas.js';
 import { gameCard, emptyState, sectionHead, statusPill, avatar, teamLogo, playerLink } from '../components.js';
 import { playersOfGame } from '../stats.js';
+import { gameFlow } from './gameflow.js';
 
 let which = 0;
 
@@ -29,6 +30,8 @@ function draw({ el, arg }) {
   if (ev && ev.sides.some((s) => s.lines.length)) out.push(lineScore(ev));
   const pog = box ? pyramid(box) : null;
   if (pog) out.push(pog);
+  const flow = box ? gameFlow(box) : null;
+  if (flow) out.push(flow);
   if (!box) {
     out.push(emptyState(ev?.state === 'pre' ? 'Game has not started' : 'Box score not available yet',
       ev?.state === 'in' ? 'Press Watch to start fetching it live.' : 'It will be filled in by the nightly sync or when you open it online.'));
