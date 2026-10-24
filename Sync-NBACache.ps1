@@ -418,6 +418,52 @@ if (-not $HistoryOnly -and -not (Test-Fresh $injPath $TableFreshHours)) {
     }
 }
 
+function Get-NbaFlow {
+    # Game flow from the play-by-play and ESPN's win probability series, both already in the game summary (no extra request).
+    # pts = [seconds elapsed, home margin, home win %]: every scoring change plus win-probability moves of 2 points or more.
+    # swing = the single play that moved the win probability most. Returns $null when there is no play-by-play.
+    param($Sum)
+    try {
+        $comp = $Sum.header.competitions[0]
+        $hc = @($comp.competitors | Where-Object { $_.homeAway -eq 'home' })[0]
+        $ac = @($comp.competitors | Where-Object { $_.homeAway -eq 'away' })[0]
+        if (-not $hc -or -not $ac) { return $null }
+        $plays = @($Sum.plays | Where-Object { $_ } | Sort-Object { [int]$_.sequenceNumber })
+        if ($plays.Count -lt 5) { return $null }
+        $wp = @{}
+        foreach ($w in @($Sum.winprobability)) { if ($w.playId) { $wp[[string]$w.playId] = [double]$w.homeWinPercentage } }
+        $abbr = @{}; $abbr[[string]$hc.team.id] = [string]$hc.team.abbreviation; $abbr[[string]$ac.team.id] = [string]$ac.team.abbreviation
+        $pts = New-Object System.Collections.ArrayList
+        $lastM = $null; $lastW = $null; $prevW = $null; $endT = 0
+        $swing = $null
+        foreach ($p in $plays) {
+            $pn = [int]$p.period.number; if ($pn -lt 1) { continue }
+            $len = $(if ($pn -le 4) { 720 } else { 300 })
+            $start = $(if ($pn -le 4) { ($pn - 1) * 720 } else { 2880 + ($pn - 5) * 300 })
+            $c = [string]$p.clock.displayValue; $left = 0.0
+            if ($c -match '^(\d+):(\d+(?:\.\d+)?)$') { $left = [double]$Matches[1] * 60 + [double]$Matches[2] } elseif ($c -match '^\d+(?:\.\d+)?$') { $left = [double]$c }
+            $t = [int][Math]::Round($start + $len - $left)
+            if ($t -lt $endT - 5) { continue }       # a late correction logged out of order (e.g. a technical free throw entered minutes later)
+            if ($t -gt $endT) { $endT = $t }
+            $m = [int]$p.homeScore - [int]$p.awayScore
+            $w = $null; if ($wp.ContainsKey([string]$p.id)) { $w = [Math]::Round($wp[[string]$p.id], 3) }
+            if ($null -ne $w -and $null -ne $prevW) {
+                $d = $w - $prevW
+                if (-not $swing -or [Math]::Abs($d) -gt [Math]::Abs($swing.d)) {
+                    $swing = [pscustomobject]@{ t = $t; d = [Math]::Round($d, 3); team = $abbr[[string]$p.team.id]; text = [string]$p.text; period = $pn; clock = $c }
+                }
+            }
+            if ($null -ne $w) { $prevW = $w }
+            $keep = ($null -eq $lastM) -or ($m -ne $lastM) -or ($null -ne $w -and ($null -eq $lastW -or [Math]::Abs($w - $lastW) -ge 0.02))
+            if ($keep) {
+                [void]$pts.Add(@($t, $m, $(if ($null -ne $w) { $w } else { -1 })))
+                $lastM = $m; if ($null -ne $w) { $lastW = $w }
+            }
+        }
+        return [pscustomobject]@{ home = [string]$hc.team.abbreviation; away = [string]$ac.team.abbreviation; end = $endT; pts = $pts.ToArray(); swing = $swing }
+    } catch { return $null }
+}
+
 function Get-NbaPossessions {
     # Counts each team's real possessions from the play-by-play that comes with the game summary (no extra request).
     # A possession ends on a made shot, a turnover, the last made free throw of a trip (not technical / flagrant / clear path,
@@ -526,7 +572,7 @@ function Save-BoxScore {
         id = $Id; date = $Date; name = $Name
         venue = $sum.gameInfo.venue.fullName; city = $sum.gameInfo.venue.address.city
         attendance = $sum.gameInfo.attendance
-        teams = $boxTeams; teamStats = $teamStats; poss = (Get-NbaPossessions $sum)
+        teams = $boxTeams; teamStats = $teamStats; poss = (Get-NbaPossessions $sum); flow = (Get-NbaFlow $sum)
         syncedAt = (Get-Date).ToString('s')
     })
     return $true
