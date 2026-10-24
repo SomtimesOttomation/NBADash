@@ -8,6 +8,7 @@ import * as gameV from './views/game.js';
 import * as standings from './views/standings.js';
 import * as leadersV from './views/leaders.js';
 import * as rankingsV from './views/rankings.js';
+import * as txV from './views/transactions.js';
 import { openSettings } from './views/settings.js';
 import { openTraffic } from './views/traffic.js';
 import { openUpdate } from './views/update.js';
@@ -30,7 +31,7 @@ export function toast(msg) {
 function route() {
   const hash = location.hash.replace(/^#\/?/, '');
   const [name, arg] = hash.split('/');
-  const map = { '': home, team: teamV, game: gameV, standings, leaders: leadersV, rankings: rankingsV, player: playerV, compare: compareV, week: weekV };
+  const map = { '': home, team: teamV, game: gameV, standings, leaders: leadersV, rankings: rankingsV, transactions: txV, player: playerV, compare: compareV, week: weekV };
   const mod = map[name] || home;
   const routeName = map[name] ? (name || 'home') : 'home';
   document.querySelectorAll('#nav a').forEach((a) => a.classList.toggle('active', a.dataset.route === routeName));

@@ -5,6 +5,7 @@ import { teamLogo, teamColor, starButton, gameCard, sectionHead, emptyState, ava
 import { leaders, posRank } from '../stats.js';
 import { teamRows, reportCard } from '../teamstats.js';
 import { gradesUnlocked } from './rankings.js';
+import { txTable } from './transactions.js';
 
 let tab = 'roster';
 let gradeShown = '';      // team whose grade square has been clicked open
@@ -16,11 +17,12 @@ export function mount(ctx) {
   S.loadInjuries(); S.loadStandings();
   S.loadSeason(ctx.arg).then(() => draw(ctx));
   S.loadLeague().then(() => draw(ctx));
+  S.loadTransactions();
   draw(ctx);
 }
 export function update(topics, ctx) {
   if (topics.has('sync') && !S.state.sync.running && !S.state.teamFiles.has(ctx.arg)) { S.loadTeamFile(ctx.arg).then(() => S.loadSeason(ctx.arg)).then(() => draw(ctx)); }
-  if (['teamfile', 'days', 'injuries', 'standings', 'favorites', 'sync', 'season', 'league'].some((t) => topics.has(t))) draw(ctx);
+  if (['teamfile', 'days', 'injuries', 'standings', 'favorites', 'sync', 'season', 'league', 'transactions'].some((t) => topics.has(t))) draw(ctx);
 }
 
 function arenaOf(abbr, file) {
@@ -49,13 +51,14 @@ function draw({ el, arg }) {
         h('dt', null, 'Head coach'), h('dd', null, file?.headCoach || '—'))),
     gradeBox(arg, () => draw({ el, arg })));
 
-  const tabs = h('div', { class: 'tabs' }, [['roster', 'Roster'], ['leaders', 'Leaders'], ['schedule', 'Schedule'], ['results', 'Box scores']].map(([k, label]) =>
+  const tabs = h('div', { class: 'tabs' }, [['roster', 'Roster'], ['leaders', 'Leaders'], ['schedule', 'Schedule'], ['results', 'Box scores'], ['tx', 'Transactions']].map(([k, label]) =>
     h('button', { class: tab === k ? 'active' : '', type: 'button', onclick: () => { tab = k; draw({ el, arg }); } }, label)));
 
   let body;
   if (!file) body = emptyState('No cached data for this team yet', 'Run a sync from settings, or it will arrive as the nightly sync trickles in.');
   else if (tab === 'roster') body = roster(file);
   else if (tab === 'leaders') body = leadersView(arg, file);
+  else if (tab === 'tx') body = txTable(teamTx(arg), { emptyText: 'No transactions recorded for this team yet' });
   else if (tab === 'schedule') body = schedule(arg, file, false);
   else body = schedule(arg, file, true);
   const stale = file && file.games.length && file.games.some((g) => !g.name);
@@ -88,6 +91,14 @@ function gradeBox(abbr, redraw) {
     gradesUnlocked() ? null : h('small', { class: 'gb-early' }, 'Before Week 3'));
 }
 
+const teamTx = (abbr) => (S.state.transactions ? S.state.transactions.events.filter((e) => e.from === abbr || e.to === abbr) : []);
+
+// players who joined this team in the last 14 days (signed or traded in), for the roster's New tag
+function newArrivals(abbr) {
+  const cutoff = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
+  return new Set(teamTx(abbr).filter((e) => e.to === abbr && e.date >= cutoff).map((e) => String(e.id)));
+}
+
 function injuryMap(abbr) {
   const m = new Map();
   const inj = S.state.injuries?.teams.find((x) => displayCode(x.team) === displayCode(abbr) || x.team === abbr);
@@ -99,6 +110,7 @@ function seasonOf(abbr) { return S.state.season.get(abbr); }
 
 function roster(file) {
   const inj = injuryMap(file.abbr);
+  const fresh = newArrivals(file.abbr);
   const se = seasonOf(file.abbr);
   const agg = se && se.agg && se.agg.games ? se.agg : null;
   const stat = new Map(agg ? agg.players.map((p) => [String(p.id), p]) : []);
@@ -115,7 +127,7 @@ function roster(file) {
     return h('tr', null,
       h('td', null, h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: '10px' } },
         avatar(p.name, p.headshot, 32),
-        h('a', { href: `#/player/${p.id}`, class: 'plink' }, h('b', null, p.name)), ' ', i ? h('span', { class: `chip ${/out/i.test(i.status) ? 'out' : 'dtd'}`, title: i.comment || '' }, i.status) : null)),
+        h('a', { href: `#/player/${p.id}`, class: 'plink' }, h('b', null, p.name)), ' ', fresh.has(String(p.id)) ? h('span', { class: 'chip new', title: 'Joined in the last 14 days' }, 'New') : null, i ? h('span', { class: `chip ${/out/i.test(i.status) ? 'out' : 'dtd'}`, title: i.comment || '' }, i.status) : null)),
       h('td', null, p.jersey ? `#${p.jersey}` : ''), h('td', null, p.pos),
       h('td', null, avg(p, 'pts')), h('td', null, avg(p, 'ast')),
       h('td', null, pctOf(p, 'fgm', 'fga')), h('td', null, pctOf(p, 'tpm', 'tpa')), h('td', null, pctOf(p, 'ftm', 'fta')),

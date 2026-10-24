@@ -180,7 +180,7 @@ $webView.Dock = 'Fill'
 $form.Controls.Add($webView)
 
 # ---------------------------------------------------------------- bridge
-$script:Allowed = @('teams.json', 'standings.json', 'injuries.json', 'sync-state.json', 'league-stats.json')
+$script:Allowed = @('teams.json', 'standings.json', 'injuries.json', 'sync-state.json', 'league-stats.json', 'transactions.json')
 function Resolve-CachePath {
     param([string]$Rel)
     if (-not $Rel -or $Rel -match '\.\.' -or $Rel -match '^[\\/]' -or $Rel -match ':') { return $null }
