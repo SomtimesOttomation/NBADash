@@ -411,8 +411,10 @@ $boxCount = 0
 $boxMax = 0
 if ($Quick) { $boxMax = 3 }
 
-$totalDays = [Math]::Max(1, [int](($yday - $start).TotalDays) + 1)
-for ($day = $start; $day -le $yday; $day = $day.AddDays(1)) {
+# today is included so box scores of games that already finished tonight get saved; today is never marked complete
+$today = $et.Date
+$totalDays = [Math]::Max(1, [int](($today - $start).TotalDays) + 1)
+for ($day = $start; $day -le $today; $day = $day.AddDays(1)) {
     $ds = $day.ToString('yyyyMMdd')
     $dayPct = 78 + 20 * ([int](($day - $start).TotalDays)) / $totalDays
     Set-Progress $dayPct ('Games for ' + $day.ToString('MMM d'))
@@ -430,7 +432,7 @@ for ($day = $start; $day -le $yday; $day = $day.AddDays(1)) {
             }
         }
         Write-Log "Day ${ds}: already complete"
-        if (-not $blocked) { $lastComplete = $ds }
+        if (-not $blocked -and $day -le $yday) { $lastComplete = $ds }
         continue
     }
 
@@ -464,6 +466,7 @@ for ($day = $start; $day -le $yday; $day = $day.AddDays(1)) {
     }
     # a past day with no games (for example Election Day) counts as complete
     $allFinal = (@($events | Where-Object { $_.status.type.state -ne 'post' }).Count -eq 0)
+    if ($day -gt $yday -and @($events).Count -eq 0) { $allFinal = $false }
     Save-Json $sbPath ([pscustomobject]@{ date = $ds; allFinal = $allFinal; syncedAt = (Get-Date).ToString('s'); events = $evOut })
 
     # box scores for finished games
@@ -479,7 +482,7 @@ for ($day = $start; $day -le $yday; $day = $day.AddDays(1)) {
     }
 
     if ($anyLive -or -not $allFinal) { $blocked = $true; Write-Log "  Day $ds not complete yet (games still live or not final)" }
-    elseif (-not $blocked) { $lastComplete = $ds }
+    elseif (-not $blocked -and $day -le $yday) { $lastComplete = $ds }
 }
 
 # ---------------------------------------------------------------- state + traffic log
