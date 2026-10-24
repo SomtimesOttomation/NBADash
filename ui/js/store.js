@@ -13,7 +13,7 @@ export const TUNING = {
   tableStaleHours:  [6, 1, 48, 'Standings and injuries (idle)', 'hours', 'Refresh only when the saved copy is older than this'],
   teamFreshHours:   [20, 1, 168, 'Team files (sync)', 'hours', 'Rosters, coaches and schedules newer than this are skipped by a sync'],
   tableFreshHours:  [4, 1, 48, 'Standings and injuries (sync)', 'hours', 'A sync skips them if the saved copy is newer than this'],
-  backfillDays:     [7, 1, 7, 'Historical Data Sync', 'days', 'Number of days to go back and fetch data. Maximum of 7 days.'],
+  backfillDays:     [7, 1, 30, 'Historical Data Sync', 'days', 'Number of days to go back and fetch data. Maximum of 30 days.'],
 };
 export const TUNE_DEFAULTS = Object.fromEntries(Object.entries(TUNING).map(([k, v]) => [k, v[0]]));
 export const state = {

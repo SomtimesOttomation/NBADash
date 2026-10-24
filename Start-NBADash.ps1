@@ -48,7 +48,7 @@ if (-not (Test-Path $settingsDir)) { New-Item -ItemType Directory -Path $setting
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
 $script:Settings = [pscustomobject]@{ favorites = @(); theme = 'system'; liveSeconds = 30; autoWatch = $true; updateCheck = $true; autoHistory = $true; autoRefresh = $false }
-$script:TuneDefaults = [ordered]@{ idleMinutes = @(10, 1, 120); oldDayHours = @(6, 1, 48); tableLiveMinutes = @(15, 5, 120); tableStaleHours = @(6, 1, 48); teamFreshHours = @(20, 1, 168); tableFreshHours = @(4, 1, 48); backfillDays = @(7, 1, 7) }
+$script:TuneDefaults = [ordered]@{ idleMinutes = @(10, 1, 120); oldDayHours = @(6, 1, 48); tableLiveMinutes = @(15, 5, 120); tableStaleHours = @(6, 1, 48); teamFreshHours = @(20, 1, 168); tableFreshHours = @(4, 1, 48); backfillDays = @(7, 1, 30) }
 foreach ($k in $script:TuneDefaults.Keys) { $script:Settings | Add-Member -NotePropertyName $k -NotePropertyValue $script:TuneDefaults[$k][0] }
 if (Test-Path $SettingsPath) {
     try {
