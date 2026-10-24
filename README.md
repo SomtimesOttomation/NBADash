@@ -53,6 +53,16 @@ The Report Card tab gives each team an overall, offense and defense letter grade
 
 The Transactions tab (and a Transactions tab on each team page) lists trades, signings and waivers/releases. They are worked out by comparing saved rosters from one sync to the next, so no extra data is downloaded. Tracking starts from the first sync after updating; dates are the day a change was picked up, and a player who left a team is marked released only once every roster has been re-checked. Players who joined a team in the last 14 days get a New tag on the roster.
 
+## How numbers are calculated
+
+Every calculated stat (ratings, eFG%, efficiency, Game Score, grades) has a dotted underline: hover it to see the formula and why it is used. Settings > Ratings formula picks how team ratings count possessions:
+
+- **Native** (default): real possessions counted from each game's play-by-play, which already comes with the box score. Games saved before this was added fall back to the Basketball-Reference estimate.
+- **Basketball-Reference**: Dean Oliver's estimate, 0.5 x [(FGA + 0.4 x FTA - 1.07 x ORB% x (FGA - FGM) + TOV) + the same for the opponent].
+- **NBA.com**: FGA - ORB + TOV + 0.436 x FTA, averaged with the opponent.
+
+Player offensive and defensive ratings always use Dean Oliver's method (as Basketball-Reference does); NBA.com's player ratings need on-court tracking that box scores do not have.
+
 ## Live game cards
 
 Live cards show the status ("Q2 5:14", "HALFTIME", "END Q1"). Once a box score has been loaded for a live game (the "Box score" button on the card, or auto-watch in automatic mode), the card also shows the latest basket: points and type (3PT, 2PT, FT), who scored, and when. It comes from the play-by-play that already ships with the box score, so it costs no extra request. ESPN does not flag timeouts or commercial breaks, only halftime and the end of a period.

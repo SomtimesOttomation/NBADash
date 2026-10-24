@@ -46,6 +46,12 @@ function reportTable(rep) {
       h('td', { class: 'num' }, sg(r.net)), h('td', { class: 'num' }, f1(r.ortg)), h('td', { class: 'num' }, f1(r.drtg)), h('td', { class: 'num' }, f1(r.efg)), h('td', { class: 'num' }, r.games))))));
 }
 
+// "counted in 40 of 52 games" for the Native formula (older saves fall back to the estimate)
+function nativeShare(rows) {
+  const games = rows.reduce((a, r) => a + r.games, 0), counted = rows.reduce((a, r) => a + (r.counted || 0), 0);
+  return games ? `, counted in ${counted} of ${games} team games, estimated for the rest` : '';
+}
+
 function draw({ el }) {
   const L = S.state.league, lg = L.data;
   const games = lg ? Object.values(lg.teams).reduce((a, t) => a + t.games, 0) / 2 : 0;
@@ -85,7 +91,7 @@ function draw({ el }) {
     } else {
       const cards = teamCards(memo.rows, tab === 'losers', 5);
       body = h('div', null, h('p', { class: 'muted', style: { margin: '0 0 12px' } },
-        tab === 'losers' ? 'The five worst teams per category, the mirror image of Leaders. ' : 'Top 5 teams per category. ', 'Teams with more games played get a ', h('span', calc('gpedge'), 'small edge'), ` in close races. Ratings are points per 100 possessions (formula: ${RATING_METHODS[method]}, change it in Settings). Hover a category name for its formula.`,
+        tab === 'losers' ? 'The five worst teams per category, the mirror image of Leaders. ' : 'Top 5 teams per category. ', 'Teams with more games played get a ', h('span', calc('gpedge'), 'small edge'), ` in close races. Ratings are points per 100 possessions (formula: ${RATING_METHODS[method]}${method === 'native' ? nativeShare(memo.rows) : ''}; change it in Settings). Hover a category name for its formula.`,
         L.loading ? ` Updating… ${L.n} of ${L.total} new box scores.` : ''), cardGrid(cards));
     }
   }

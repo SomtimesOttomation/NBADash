@@ -112,6 +112,55 @@ function ConvertTo-NbaDay {
     return [pscustomobject]@{ date = $Ds; allFinal = $allFinal; fetchedAt = (Get-Date).ToUniversalTime().ToString('o'); events = $out }
 }
 
+function Get-NbaPossessions {
+    # Counts each team's real possessions from the play-by-play that comes with the game summary (no extra request).
+    # A possession ends on a made shot, a turnover, the last made free throw of a trip (not technical / flagrant / clear path,
+    # and not the extra shot of an and-one), the other team's defensive rebound, or the end of a period.
+    # Returns @{ ABBR = n; ABBR2 = n } or $null when the play-by-play is missing or looks incomplete.
+    param($Sum)
+    try {
+        $teams = @($Sum.boxscore.teams)
+        if ($teams.Count -ne 2) { return $null }
+        $ids = @([string]$teams[0].team.id, [string]$teams[1].team.id)
+        $abbr = @{}; foreach ($t in $teams) { $abbr[[string]$t.team.id] = [string]$t.team.abbreviation }
+        $plays = @($Sum.plays | Where-Object { $_ } | Sort-Object { [int]$_.sequenceNumber })
+        if ($plays.Count -lt 100) { return $null }
+        $ends = @{ $ids[0] = 0; $ids[1] = 0 }
+        $st = @{ cur = $null; active = $false; last = ''; per = $null }
+        $other = { param($t) if ($t -eq $ids[0]) { $ids[1] } else { $ids[0] } }
+        $end = { param($t) $ends[$t]++; $st.cur = (& $other $t); $st.active = $false }
+        foreach ($p in $plays) {
+            $typ = [string]$p.type.text
+            $t = [string]$p.team.id
+            $pn = [int]$p.period.number
+            $clk = [string]$p.clock.displayValue
+            if ($null -ne $st.per -and $pn -ne $st.per) { if ($st.cur -and $st.active) { & $end $st.cur }; $st.cur = $null; $st.active = $false }
+            $st.per = $pn
+            if ($typ -eq 'End Period' -or $typ -eq 'End Game') { if ($st.cur -and $st.active) { & $end $st.cur }; $st.cur = $null; $st.active = $false; continue }
+            if ($ids -notcontains $t) { continue }
+            if ($typ -eq 'Jumpball') { $st.cur = $t; $st.active = $true; continue }
+            if ($typ -like 'Free Throw*') {
+                $st.cur = $t; $st.active = $true
+                $special = ($typ -match 'Technical|Flagrant|Clear Path')
+                if ($p.scoringPlay -and -not $special -and $typ -match '(\d+) of (\d+)' -and $Matches[1] -eq $Matches[2]) {
+                    if ($st.last -ne ('fg|' + $t + '|' + $pn + '|' + $clk)) { & $end $t; $st.last = 'ft|' + $t + '|' + $pn + '|' + $clk }
+                }
+                continue
+            }
+            if ($typ -like '*Turnover*' -or $typ -eq 'Traveling') { & $end $t; $st.last = 'to'; continue }
+            if ($typ -eq 'Defensive Rebound') { $o = & $other $t; if ($st.cur -eq $o) { & $end $o }; $st.cur = $t; $st.active = $true; continue }
+            if ($typ -eq 'Offensive Rebound') { $st.cur = $t; $st.active = $true; continue }
+            if ($p.shootingPlay) {
+                $st.cur = $t; $st.active = $true
+                if ($p.scoringPlay) { & $end $t; $st.last = 'fg|' + $t + '|' + $pn + '|' + $clk }
+            }
+        }
+        if ($ends[$ids[0]] -lt 50 -or $ends[$ids[1]] -lt 50) { return $null }
+        $out = [ordered]@{}; $out[$abbr[$ids[0]]] = $ends[$ids[0]]; $out[$abbr[$ids[1]]] = $ends[$ids[1]]
+        return [pscustomobject]$out
+    } catch { return $null }
+}
+
 function ConvertTo-NbaBox {
     param($Sum, $Game)
     $boxTeams = @($Sum.boxscore.players | ForEach-Object {
@@ -157,6 +206,7 @@ function ConvertTo-NbaBox {
         venue = $Sum.gameInfo.venue.fullName; city = $Sum.gameInfo.venue.address.city
         attendance = $Sum.gameInfo.attendance
         teams = $boxTeams; teamStats = $teamStats; syncedAt = (Get-Date).ToString('s')
+        poss = $(if ($gState -eq 'post') { Get-NbaPossessions $Sum } else { $null })
     }
 }
 
