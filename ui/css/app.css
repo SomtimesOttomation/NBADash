@@ -374,3 +374,14 @@ a.plink:hover { color: var(--accent2); }
 .nav a { padding: 6px 10px; }
 .psearch input { width: clamp(170px, 20vw, 345px); }
 @media (max-width: 1240px) { #topbar { gap: 10px; } .nav a { padding: 6px 7px; font-size: 13px; } .psearch input { width: 150px; } }
+
+/* formula hover cards */
+.calc { cursor: help; text-decoration: underline dotted color-mix(in srgb, var(--muted) 70%, transparent); text-underline-offset: 3px; }
+.calc:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; border-radius: 3px; }
+.grade-box.calc { text-decoration: none; }
+.calc-tip { position: fixed; z-index: 100; display: none; max-width: 420px; padding: 12px 14px; border-radius: 10px; background: var(--surface); color: var(--text); border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0,0,0,.25); font-size: 12.5px; line-height: 1.45; pointer-events: none; text-transform: none; letter-spacing: normal; font-weight: 400; }
+.calc-tip b { display: block; font-size: 13px; margin-bottom: 6px; }
+.calc-tip pre { margin: 0 0 8px; padding: 8px 10px; border-radius: 7px; background: var(--surface2); font: 12px/1.45 ui-monospace, Consolas, monospace; white-space: pre-wrap; }
+.calc-tip p { margin: 0 0 6px; }
+.calc-tip small { color: var(--muted); }
+.rate-panel .seg { margin-bottom: 4px; }

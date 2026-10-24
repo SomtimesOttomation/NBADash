@@ -47,13 +47,13 @@ $settingsDir = Split-Path $SettingsPath
 if (-not (Test-Path $settingsDir)) { New-Item -ItemType Directory -Path $settingsDir -Force | Out-Null }
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
-$script:Settings = [pscustomobject]@{ favorites = @(); theme = 'system'; liveSeconds = 30; autoWatch = $true; updateCheck = $true; autoHistory = $true; autoRefresh = $false }
+$script:Settings = [pscustomobject]@{ favorites = @(); theme = 'system'; liveSeconds = 30; autoWatch = $true; updateCheck = $true; autoHistory = $true; autoRefresh = $false; ratingMethod = 'native' }
 $script:TuneDefaults = [ordered]@{ idleMinutes = @(10, 1, 120); oldDayHours = @(6, 1, 48); tableLiveMinutes = @(15, 5, 120); tableStaleHours = @(6, 1, 48); teamFreshHours = @(20, 1, 168); tableFreshHours = @(4, 1, 48); backfillDays = @(7, 1, 30) }
 foreach ($k in $script:TuneDefaults.Keys) { $script:Settings | Add-Member -NotePropertyName $k -NotePropertyValue $script:TuneDefaults[$k][0] }
 if (Test-Path $SettingsPath) {
     try {
         $loaded = Get-Content $SettingsPath -Raw | ConvertFrom-Json
-        foreach ($k in (@('favorites', 'theme', 'liveSeconds', 'autoWatch', 'updateCheck', 'autoHistory', 'autoRefresh') + @($script:TuneDefaults.Keys))) { if ($null -ne $loaded.$k) { $script:Settings.$k = $loaded.$k } }
+        foreach ($k in (@('favorites', 'theme', 'liveSeconds', 'autoWatch', 'updateCheck', 'autoHistory', 'autoRefresh', 'ratingMethod') + @($script:TuneDefaults.Keys))) { if ($null -ne $loaded.$k) { $script:Settings.$k = $loaded.$k } }
     } catch { }
 }
 
@@ -279,6 +279,7 @@ function Invoke-Command2 {
                 updateCheck = $(if ($null -eq $s.updateCheck) { $true } else { [bool]$s.updateCheck })
                 autoHistory = $(if ($null -eq $s.autoHistory) { $true } else { [bool]$s.autoHistory })
                 autoRefresh = [bool]$s.autoRefresh
+                ratingMethod = $(if (@('native', 'bref', 'nba') -contains [string]$s.ratingMethod) { [string]$s.ratingMethod } else { 'native' })
             }
             foreach ($k in $script:TuneDefaults.Keys) {
                 $d = $script:TuneDefaults[$k]; $v = $d[0]

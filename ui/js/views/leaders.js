@@ -2,6 +2,7 @@ import * as S from '../store.js';
 import { h } from '../util.js';
 import { emptyState, leaderCardGrid, leaderRowSections } from '../components.js';
 import { leagueLeaders, leagueLosers } from '../stats.js';
+import { calc } from '../formulas.js';
 
 const KEY = 'nbadash.leadersView';
 let mode = 'cards';
@@ -39,9 +40,8 @@ function draw({ el }) {
   else {
     if (memo.rev !== L.rev || memo.tab !== tab || !memo.cards) memo = { rev: L.rev, tab, cards: (tab === 'losers' ? leagueLosers : leagueLeaders)(lg, 5) };
     const note = h('p', { class: 'muted', style: { margin: '0 0 12px' } },
-      tab === 'losers'
-        ? 'The five worst per category, the mirror image of Leaders. Same bar to qualify: 10+ minutes a game and at least half of their team\u2019s games. Offensive and defensive ratings are Dean Oliver estimates; efficiency is points + rebounds + assists + steals + blocks minus misses and turnovers.'
-        : 'Top 5 per category. Players with more games get a small edge in close races. Players need 10+ minutes a game and at least half of their team\u2019s games. Offensive and defensive ratings are Dean Oliver estimates; efficiency is points + rebounds + assists + steals + blocks minus misses and turnovers.',
+      tab === 'losers' ? 'The five worst per category, the mirror image of Leaders. ' : 'Top 5 per category. ',
+      'Players with more games get a ', h('span', calc('gpedge'), 'small edge'), ' in close races. Players need 10+ minutes a game and at least half of their team\u2019s games. Hover a category name for its formula.',
       L.loading ? ` Updating\u2026 ${L.n} of ${L.total} new box scores.` : '');
     body = h('div', null, note, mode === 'cards' ? leaderCardGrid(memo.cards, { showTeam: true }) : leaderRowSections(memo.cards, { worst: tab === 'losers' }));
   }

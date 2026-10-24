@@ -6,10 +6,11 @@ import { leaders, posRank } from '../stats.js';
 import { teamRows, reportCard } from '../teamstats.js';
 import { gradesUnlocked } from './rankings.js';
 import { txTable } from './transactions.js';
+import { calc } from '../formulas.js';
 
 let tab = 'roster';
 let gradeShown = '';      // team whose grade square has been clicked open
-let gradeMemo = { rev: -1, rep: null };
+let gradeMemo = { rev: -1, method: '', rep: null };
 
 export function mount(ctx) {
   S.loadTeamFile(ctx.arg).then(() => draw(ctx));
@@ -22,7 +23,7 @@ export function mount(ctx) {
 }
 export function update(topics, ctx) {
   if (topics.has('sync') && !S.state.sync.running && !S.state.teamFiles.has(ctx.arg)) { S.loadTeamFile(ctx.arg).then(() => S.loadSeason(ctx.arg)).then(() => draw(ctx)); }
-  if (['teamfile', 'days', 'injuries', 'standings', 'favorites', 'sync', 'season', 'league', 'transactions'].some((t) => topics.has(t))) draw(ctx);
+  if (['teamfile', 'days', 'injuries', 'standings', 'favorites', 'sync', 'season', 'league', 'transactions', 'settings'].some((t) => topics.has(t))) draw(ctx);
 }
 
 function arenaOf(abbr, file) {
@@ -73,7 +74,8 @@ function draw({ el, arg }) {
 function teamGrade(abbr) {
   const L = S.state.league;
   if (!L.data) return null;
-  if (gradeMemo.rev !== L.rev || !gradeMemo.rep) gradeMemo = { rev: L.rev, rep: reportCard(teamRows(L.data)) };
+  const method = S.state.settings.ratingMethod || 'native';
+  if (gradeMemo.rev !== L.rev || gradeMemo.method !== method || !gradeMemo.rep) gradeMemo = { rev: L.rev, method, rep: reportCard(teamRows(L.data, method)) };
   return gradeMemo.rep.find((r) => r.abbr === abbr) || null;
 }
 
@@ -81,7 +83,7 @@ function gradeBox(abbr, redraw) {
   const open = gradeShown === abbr;
   const g = open ? teamGrade(abbr) : null;
   const toggle = () => { gradeShown = open ? '' : abbr; redraw(); };
-  const attrs = { class: `grade-box ${open ? 'open' : ''}`, type: 'button', onclick: toggle, title: open ? 'Hide grade' : 'Show team grade' };
+  const attrs = { ...calc('grade'), class: `grade-box ${open ? 'open' : ''}`, type: 'button', onclick: toggle };
   if (!open) return h('button', attrs, h('span', { class: 'gb-q' }, '?'), h('small', null, 'Team grade'));
   if (!g) return h('button', attrs, h('span', { class: 'gb-q' }, '–'), h('small', null, S.state.league.loading ? 'Loading…' : 'No games yet'));
   return h('button', attrs,

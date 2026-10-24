@@ -1,4 +1,5 @@
 import * as S from '../store.js';
+import { calc } from '../formulas.js';
 import { h, fmtKey, etKey } from '../util.js';
 import { displayCode } from '../arenas.js';
 import { gameCard, emptyState, sectionHead, statusPill, avatar, teamLogo, playerLink } from '../components.js';
@@ -58,7 +59,7 @@ function pyramid(box) {
     h('span', { class: 'pog-line' }, `${p.line.stl} STL \u00b7 ${p.line.blk} BLK \u00b7 ${p.line.fgm}/${p.line.fga} FG`),
     h('small', { class: 'muted' }, `Game Score ${p.score.toFixed(1)} \u00b7 ORtg ${fmt(p.ortg)} \u00b7 DRtg ${fmt(p.drtg)}`));
   return h('section', { class: 'pog' },
-    h('h2', { class: 'pog-title' }, 'Players of the game'),
+    h('h2', { class: 'pog-title' }, h('span', calc('gamescore'), 'Players of the game')),
     h('div', { class: 'pog-row' }, card(top[0], 0), card(top[1], 1), card(top[2], 2)),
     h('p', { class: 'pog-note' }, 'Calculated by this dashboard, not an official award or an ESPN stat. Players on both teams are ranked by Game Score: ',
       'points + 0.4\u00d7FGM \u2212 0.7\u00d7FGA \u2212 0.4\u00d7(FTA\u2212FTM) + 0.7\u00d7OREB + 0.3\u00d7DREB + STL + 0.7\u00d7AST + 0.7\u00d7BLK \u2212 0.4\u00d7PF \u2212 TO. Ties go to plus/minus. ',
