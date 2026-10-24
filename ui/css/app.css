@@ -385,3 +385,7 @@ a.plink:hover { color: var(--accent2); }
 .calc-tip p { margin: 0 0 6px; }
 .calc-tip small { color: var(--muted); }
 .rate-panel .seg { margin-bottom: 4px; }
+
+/* settings tabs */
+.settings-tabs { margin-bottom: 14px; }
+.settings-body { min-height: 260px; }

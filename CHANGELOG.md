@@ -13,6 +13,9 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 **Bug/Fix**
 - Team ratings now count possessions the same way as player ratings.
 
+**Redesign**
+- Settings split into General, Data and Sync tabs.
+
 ## Released
 
 ### v0.11.0
