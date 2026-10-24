@@ -332,3 +332,17 @@ a.plink:hover { color: var(--accent2); }
 
 /* final games: the losing team's score fades further so winner and loser separate clearly */
 .side.lose .score { opacity: .6; font-weight: 500; }
+
+/* team rankings + report card */
+.tr-wrap { padding: 4px 0; overflow-x: auto; }
+.tr-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.tr-table th, .tr-table td { padding: 8px 12px; text-align: left; border-top: 1px solid var(--line); white-space: nowrap; }
+.tr-table thead th { border-top: 0; color: var(--muted); font-weight: 550; font-size: 12px; }
+.tr-table .num { text-align: center; }
+.tr-table .rk { color: var(--muted); font-weight: 600; width: 28px; }
+.tr-team { display: inline-flex; align-items: center; gap: 8px; }
+.tr-team small { color: var(--muted); }
+.grade { display: inline-block; min-width: 34px; padding: 2px 8px; border-radius: 7px; font-weight: 700; text-align: center; color: #fff; }
+.grade.g-a { background: #1f9d55; } .grade.g-b { background: #3b82c4; } .grade.g-c { background: #b7892b; } .grade.g-d { background: #d9731f; } .grade.g-f { background: #cc3b3b; }
+.tr-toggle { display: inline-flex; align-items: center; gap: 4px; color: var(--text); cursor: pointer; }
+.tr-warn { color: #d9731f; margin: 0 0 10px; }
