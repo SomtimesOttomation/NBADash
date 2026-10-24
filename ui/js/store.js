@@ -31,6 +31,7 @@ export const state = {
   teamFiles: new Map(),     // abbr -> file | null
   standings: null,
   injuries: null,
+  transactions: null,
   boxes: new Map(),         // eventId -> box
   live: { ok: true, at: 0, error: '', interval: 0, anyLive: false },
   watch: new Set(),
@@ -168,7 +169,7 @@ function onSync(d) {
   const wasRunning = state.sync.running;
   state.sync = { ...state.sync, ...d };
   if (wasRunning && d.running === false) state.sync.finishedAt = Date.now();
-  if (d.running === false) { state.season.clear(); loadLeague(); refreshCachedBoxes(); refreshCachedDays(); loadStandings(true); loadInjuries(true); state.teamFiles.clear(); playerIndex = null; }
+  if (d.running === false) { state.season.clear(); loadLeague(); refreshCachedBoxes(); refreshCachedDays(); loadStandings(true); loadInjuries(true); loadTransactions(true); state.teamFiles.clear(); playerIndex = null; }
   notify('sync');
 }
 
@@ -414,6 +415,16 @@ export async function loadInjuries(force) {
   const s = await readCache('injuries.json');
   if (s) { s.teams = asArray(s.teams).map((t) => ({ ...t, players: asArray(t.players) })); state.injuries = s; notify('injuries'); }
   return state.injuries;
+}
+
+// Trades, signings and releases the sync worked out from roster changes (newest first).
+export async function loadTransactions(force) {
+  if (state.transactions && !force) return state.transactions;
+  const s = await readCache('transactions.json');
+  const events = asArray(s && s.events).filter((e) => e && e.type).reverse();
+  state.transactions = { updatedAt: s ? s.updatedAt : '', events };
+  notify('transactions');
+  return state.transactions;
 }
 
 export async function refreshCachedBoxes() {

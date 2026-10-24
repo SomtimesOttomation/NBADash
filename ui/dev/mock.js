@@ -143,6 +143,14 @@ export async function request(cmd, args) {
       if ((m = p.match(/^boxscores\/(\d+)\.json$/))) return box(m[1]);
       if ((m = p.match(/^teams\/(\w+)\.json$/))) return TEAMS.some((t) => t.abbr === m[1]) ? teamFile(m[1]) : null;
       if (p === 'league-stats.json') return leagueFile;
+      if (p === 'transactions.json') {
+        const d = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+        return { updatedAt: new Date().toISOString(), events: [
+          { date: d(30), type: 'released', id: '9901', name: 'Sample Veteran', pos: 'C', from: 'BOS', to: '' },
+          { date: d(9), type: 'signed', id: '9902', name: 'Sample Rookie', pos: 'G', from: '', to: 'CHI' },
+          { date: d(2), type: 'trade', id: '281', name: 'Raptors Player 2', pos: 'SG', from: 'ATL', to: 'TOR' },
+        ] };
+      }
       if (p === 'standings.json') {
         const mk = (names) => names.map((a, i) => ({ abbr: a, name: a, stats: { wins: String(5 - (i % 5)), losses: String(i % 5), winPercent: String(((5 - (i % 5)) / 5).toFixed(3)), gamesBehind: String(i % 5), Home: '3-1', Road: '2-2', 'Last Ten Games': '5-5', streak: 'W1' } }));
         const ab = TEAMS.map((t) => t.abbr);
