@@ -15,6 +15,7 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 
 **Bug/Fix**
 - Team ratings now count possessions the same way as player ratings.
+- DashLauncher's stop button now pauses data refresh only; update checks keep working.
 
 **Redesign**
 - Settings split into General, Data and Sync tabs.
