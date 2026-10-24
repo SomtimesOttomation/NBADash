@@ -19,7 +19,7 @@ a nightly cache sync, and a secret traffic counter (click the "NBA 2026-27" titl
 - `ui\` the web UI. Open `ui\index.html` through any static server for a mock-data preview in a normal browser.
 
 ## Player search and comparison
-Type in the search box next to League Leaders (press `/` to jump to it). Suggestions appear as you type: Tab or the
+Type in the search box next to Leaderboards (press `/` to jump to it). Suggestions appear as you type: Tab or the
 right arrow completes the top name, Enter opens it, and the box offers your recent players when it is empty. Names come
 from the cached rosters; if nothing matches there, ESPN's player search is asked (this also finds retired players).
 

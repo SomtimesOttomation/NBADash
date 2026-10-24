@@ -3,19 +3,24 @@ import { h, fmtKey, fmtTime, etKey, num } from '../util.js';
 import { ARENAS, displayCode } from '../arenas.js';
 import { teamLogo, teamColor, starButton, gameCard, sectionHead, emptyState, avatar, leaderCardGrid } from '../components.js';
 import { leaders, posRank } from '../stats.js';
+import { teamRows, reportCard } from '../teamstats.js';
+import { gradesUnlocked } from './rankings.js';
 
 let tab = 'roster';
+let gradeShown = '';      // team whose grade square has been clicked open
+let gradeMemo = { rev: -1, rep: null };
 
 export function mount(ctx) {
   S.loadTeamFile(ctx.arg).then(() => draw(ctx));
   S.state.cachedDayKeys.slice(0, 40).forEach((k) => S.loadDay(k));     // so finished games can be completed from cached scoreboards
   S.loadInjuries(); S.loadStandings();
   S.loadSeason(ctx.arg).then(() => draw(ctx));
+  S.loadLeague().then(() => draw(ctx));
   draw(ctx);
 }
 export function update(topics, ctx) {
   if (topics.has('sync') && !S.state.sync.running && !S.state.teamFiles.has(ctx.arg)) { S.loadTeamFile(ctx.arg).then(() => S.loadSeason(ctx.arg)).then(() => draw(ctx)); }
-  if (['teamfile', 'days', 'injuries', 'standings', 'favorites', 'sync', 'season'].some((t) => topics.has(t))) draw(ctx);
+  if (['teamfile', 'days', 'injuries', 'standings', 'favorites', 'sync', 'season', 'league'].some((t) => topics.has(t))) draw(ctx);
 }
 
 function arenaOf(abbr, file) {
@@ -41,7 +46,8 @@ function draw({ el, arg }) {
       h('div', { class: 'meta' }, [rec, st && `${st.conf}`].filter(Boolean).join(' · ')),
       h('dl', { class: 'kv', style: { marginTop: '8px' } },
         h('dt', null, 'Arena'), h('dd', null, arenaOf(arg, file)),
-        h('dt', null, 'Head coach'), h('dd', null, file?.headCoach || '—'))));
+        h('dt', null, 'Head coach'), h('dd', null, file?.headCoach || '—'))),
+    gradeBox(arg, () => draw({ el, arg })));
 
   const tabs = h('div', { class: 'tabs' }, [['roster', 'Roster'], ['leaders', 'Leaders'], ['schedule', 'Schedule'], ['results', 'Box scores']].map(([k, label]) =>
     h('button', { class: tab === k ? 'active' : '', type: 'button', onclick: () => { tab = k; draw({ el, arg }); } }, label)));
@@ -58,6 +64,28 @@ function draw({ el, arg }) {
     h('button', { class: 'btn primary', type: 'button', disabled: S.state.sync.running ? true : null, onclick: () => S.runSync('team', arg) },
       S.state.sync.running ? 'Updating\u2026' : 'Update this team now')) : null;
   el.replaceChildren(hero, tabs, ...(notice ? [notice] : []), body);
+}
+
+// Team grade from the Report Card: a black ? square until clicked, then the current grade.
+function teamGrade(abbr) {
+  const L = S.state.league;
+  if (!L.data) return null;
+  if (gradeMemo.rev !== L.rev || !gradeMemo.rep) gradeMemo = { rev: L.rev, rep: reportCard(teamRows(L.data)) };
+  return gradeMemo.rep.find((r) => r.abbr === abbr) || null;
+}
+
+function gradeBox(abbr, redraw) {
+  const open = gradeShown === abbr;
+  const g = open ? teamGrade(abbr) : null;
+  const toggle = () => { gradeShown = open ? '' : abbr; redraw(); };
+  const attrs = { class: `grade-box ${open ? 'open' : ''}`, type: 'button', onclick: toggle, title: open ? 'Hide grade' : 'Show team grade' };
+  if (!open) return h('button', attrs, h('span', { class: 'gb-q' }, '?'), h('small', null, 'Team grade'));
+  if (!g) return h('button', attrs, h('span', { class: 'gb-q' }, '–'), h('small', null, S.state.league.loading ? 'Loading…' : 'No games yet'));
+  return h('button', attrs,
+    h('span', { class: `grade g-${g.overall.grade[0].toLowerCase()} gb-grade` }, g.overall.grade),
+    h('small', null, `#${g.overall.rank} of ${gradeMemo.rep.length}`),
+    h('span', { class: 'gb-parts' }, 'Off ', h('span', { class: `grade g-${g.offGrade[0].toLowerCase()}` }, g.offGrade), ' Def ', h('span', { class: `grade g-${g.defGrade[0].toLowerCase()}` }, g.defGrade)),
+    gradesUnlocked() ? null : h('small', { class: 'gb-early' }, 'Before Week 3'));
 }
 
 function injuryMap(abbr) {
@@ -80,22 +108,28 @@ function roster(file) {
   const bench = file.players.filter((p) => !startIds.has(String(p.id))).sort(byPos);
 
   const avg = (p, k) => { const s = stat.get(String(p.id)); return s && s.gp ? (s.tot[k] / s.gp).toFixed(1) : '\u2013'; };
+  const pctOf = (p, m, a) => { const s = stat.get(String(p.id)); return s && s.tot[a] > 0 ? (100 * s.tot[m] / s.tot[a]).toFixed(1) : '\u2013'; };
+  const pmOf = (p) => { const s = stat.get(String(p.id)); if (!s || !s.gp) return '\u2013'; const v = s.tot.pm / s.gp; return (v > 0 ? '+' : '') + v.toFixed(1); };
   const row = (p) => {
     const i = inj.get(String(p.id));
     return h('tr', null,
       h('td', null, h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: '10px' } },
         avatar(p.name, p.headshot, 32),
         h('a', { href: `#/player/${p.id}`, class: 'plink' }, h('b', null, p.name)), ' ', i ? h('span', { class: `chip ${/out/i.test(i.status) ? 'out' : 'dtd'}`, title: i.comment || '' }, i.status) : null)),
-      h('td', null, p.jersey ? `#${p.jersey}` : ''), h('td', null, p.pos), h('td', null, p.height), h('td', null, p.weight), h('td', null, p.age ?? ''), h('td', null, p.years ?? ''),
-      h('td', null, avg(p, 'pts')), h('td', null, avg(p, 'reb')), h('td', null, avg(p, 'ast')));
+      h('td', null, p.jersey ? `#${p.jersey}` : ''), h('td', null, p.pos),
+      h('td', null, avg(p, 'pts')), h('td', null, avg(p, 'ast')),
+      h('td', null, pctOf(p, 'fgm', 'fga')), h('td', null, pctOf(p, 'tpm', 'tpa')), h('td', null, pctOf(p, 'ftm', 'fta')),
+      h('td', null, avg(p, 'reb')), h('td', null, avg(p, 'blk')), h('td', null, avg(p, 'stl')),
+      h('td', null, avg(p, 'tov')), h('td', null, avg(p, 'pf')), h('td', null, pmOf(p)));
   };
-  const group = (name, extra) => h('tr', { class: `grp ${extra || ''}` }, h('td', { colspan: 10 }, name));
-  const head = ['Player', '#', 'Pos', 'Ht', 'Wt', 'Age', 'Exp', 'PPG', 'RPG', 'APG'];
+  const head = ['Player', '#', 'Pos', 'PPG', 'APG', 'FG%', '3P%', 'FT%', 'RPG', 'BPG', 'SPG', 'TOV', 'PF', '+/-'];
+  const tips = { PF: 'Fouls per game', TOV: 'Turnovers per game', '+/-': 'Plus / minus per game' };
+  const group = (name, extra) => h('tr', { class: `grp ${extra || ''}` }, h('td', { colspan: head.length }, name));
   const body = starters.length
     ? [group('Starters (last game\u2019s starting five, by position)'), starters.map(row), group('Bench', 'bench'), bench.map(row)]
     : [group(se && se.loading ? 'Roster (loading starters\u2026)' : 'Roster (starters appear after the first saved box score)'), [...file.players].sort(byPos).map(row)];
-  return h('div', { class: 'card scroll-x' }, h('table', { class: 'tbl' },
-    h('thead', null, h('tr', null, head.map((c) => h('th', null, c)))), h('tbody', null, body)));
+  return h('div', { class: 'card scroll-x' }, h('table', { class: 'tbl roster' },
+    h('thead', null, h('tr', null, head.map((c) => h('th', { title: tips[c] || null }, c)))), h('tbody', null, body)));
 }
 
 function leadersView(abbr, file) {
