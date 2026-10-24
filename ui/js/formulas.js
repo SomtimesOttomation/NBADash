@@ -49,8 +49,8 @@ const DEFS = {
   gamescore: () => ({ title: 'Game Score', formula: 'GmSc = PTS + 0.4×FGM − 0.7×FGA − 0.4×(FTA − FTM) + 0.7×ORB + 0.3×DRB + STL + 0.7×AST + 0.7×BLK − 0.4×PF − TOV', why: 'John Hollinger’s single-game rating, used to pick Player of the Game. Around 10 is average, 40 is a great night.' }),
   grade: () => ({
     title: 'Report Card grade',
-    formula: 'Overall = 30% Net Rating + 35% Offense + 35% Defense\nOffense = 20% ORtg + 32% eFG% + 20% TOV% + 16% ORB% + 12% FT rate\nDefense = same five, for what opponents did',
-    why: 'Each input is turned into a percentile against the other teams, then weighted. The weights follow Dean Oliver’s Four Factors (shooting matters most). Grades are a curve: roughly the top 10% get an A. Teams with more games get a small edge.', note: methodLine(),
+    formula: 'Overall = 30% SRS + 35% Offense + 35% Defense\nOffense = 20% ORtg + 32% eFG% + 20% TOV% + 16% ORB% + 12% FT rate\nDefense = same five, for what opponents did',
+    why: 'Each input is turned into a percentile against the other teams, then weighted. SRS is the point differential adjusted for strength of schedule, so a team isn\u2019t marked down for facing good opponents. The weights follow Dean Oliver’s Four Factors (shooting matters most). Grades are a curve: roughly the top 10% get an A. Teams with more games get a small edge.', note: methodLine(),
   }),
   gpedge: () => ({ title: 'Games-played edge', formula: 'Ranked value = (GP × value + 0.5 × league average) / (GP + 0.5)', why: 'Pulls each number slightly toward the average, as if half an average game were added. Breaks near-ties in favor of bigger samples; fades as the season goes on. The number shown is unchanged.' }),
 };
