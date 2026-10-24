@@ -4,6 +4,8 @@ import { h, ago } from '../util.js';
 import { displayCode } from '../arenas.js';
 import { teamLogo } from '../components.js';
 import { openUpdate } from './update.js';
+import { RATING_METHODS } from '../stats.js';
+import { METHOD_NOTES } from '../formulas.js';
 
 function overlay(content) {
   const root = document.getElementById('overlay-root');
@@ -27,6 +29,7 @@ export function openSettings() {
         ['system', 'light', 'dark'].map((t) => h('button', { class: `btn ${s.theme === t ? 'primary' : ''}`, type: 'button', style: { marginRight: '6px' }, onclick: () => { S.saveSettings({ theme: t }); close(); } }, t))),
       h('p', null, h('label', null, h('input', { type: 'checkbox', checked: s.updateCheck !== false ? true : null, onchange: (e) => S.saveSettings({ updateCheck: e.target.checked }) }),
         ' Check GitHub for a new version when the app starts '), h('button', { class: 'btn', type: 'button', style: { marginLeft: '8px' }, onclick: () => { close(); openUpdate(); } }, `v${S.state.version || '?'} - Check for updates`)),
+      ratingsPanel(),
       h('p', null, h('b', null, 'Favorites '), favs.size ? [...favs].map((a) => h('span', { style: { marginRight: '6px' } }, teamLogo(a, 26))) : h('small', null, 'none yet – star a team in the banner')),
       h('hr', { style: { border: 0, borderTop: '1px solid var(--line)' } }),
       h('p', null, h('b', null, 'Data cache '), h('small', null, S.state.cacheDir || '(dev preview)')),
@@ -121,6 +124,22 @@ function timingPanel() {
       } }, 'Reset to defaults')),
       h('div', { class: 'tune' }, rows),
       h('small', null, 'Live, idle and standings changes apply immediately; the sync values apply to the next sync, including the nightly task.'));
+  };
+  paint();
+  return box;
+}
+
+// Which possession formula the team ratings (ORtg, DRtg, Net) use.
+function ratingsPanel() {
+  const box = h('div', { class: 'rate-panel' });
+  const paint = () => {
+    const cur = S.state.settings.ratingMethod || 'native';
+    box.replaceChildren(
+      h('p', { style: { marginBottom: '6px' } }, h('b', null, 'Ratings formula '), h('small', null, 'How team Offensive, Defensive and Net Rating count possessions. Hover any rating for the full formula.')),
+      h('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Ratings formula' }, Object.entries(RATING_METHODS).map(([k, label]) => h('button', {
+        type: 'button', role: 'radio', 'aria-checked': cur === k ? 'true' : 'false', class: cur === k ? 'active' : '',
+        onclick: () => { S.saveSettings({ ratingMethod: k }); paint(); } }, label))),
+      h('p', null, h('small', null, METHOD_NOTES[cur])));
   };
   paint();
   return box;

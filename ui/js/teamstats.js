@@ -1,20 +1,27 @@
 // Team-level numbers for the Team Rankings page: category leaders/losers and the Report Card grades.
 // Everything is computed from the league totals already built from saved box scores (lg.teams[abbr] = { games, T, O }).
 
-import { gpAdjust } from './stats.js';
+import { gpAdjust, possBref, possNba } from './stats.js';
 
 const rate = (n, d) => (d > 0 ? n / d : NaN);
 
-export function teamRows(lg) {
+// Offensive / defensive possessions for one team under the chosen ratings formula.
+export function teamPoss(t, method) {
+  if (method === 'nba') { const p = possNba(t.T, t.O); return { o: p, d: p, counted: 0 }; }
+  if (method === 'native' && t.nat && t.nat.o > 0 && t.nat.d > 0) return { o: t.nat.o, d: t.nat.d, counted: t.nat.counted || 0 };
+  const p = possBref(t.T, t.O); return { o: p, d: p, counted: 0 };
+}
+
+export function teamRows(lg, method = 'native') {
   const rows = [];
   for (const [abbr, t] of Object.entries(lg.teams || {})) {
     const { T, O, games } = t;
     if (!games || !(T.fga > 0) || !(O.fga > 0)) continue;
-    const poss = 0.5 * ((T.fga + 0.44 * T.fta - T.oreb + T.tov) + (O.fga + 0.44 * O.fta - O.oreb + O.tov));
-    if (!(poss > 0)) continue;
-    const ortg = (100 * T.pts) / poss, drtg = (100 * O.pts) / poss;
+    const P = teamPoss(t, method);
+    if (!(P.o > 0) || !(P.d > 0)) continue;
+    const ortg = (100 * T.pts) / P.o, drtg = (100 * O.pts) / P.d;
     rows.push({
-      abbr, games,
+      abbr, games, poss: P.o / games, counted: P.counted,
       ppg: T.pts / games, oppg: O.pts / games, diff: (T.pts - O.pts) / games,
       ortg, drtg, net: ortg - drtg,
       fgp: 100 * rate(T.fgm, T.fga), tpp: 100 * rate(T.tpm, T.tpa), ftp: 100 * rate(T.ftm, T.fta),

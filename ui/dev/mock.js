@@ -107,6 +107,7 @@ function box(id) {
   };
   return { id, date: ev.date, name: ev.name, venue: ev.venue, city: 'Mock City', attendance: '18,000',
     teams: ev.sides.map(mk),
+    poss: ev.state === 'post' && +id % 2 === 0 ? Object.fromEntries(ev.sides.map((s, i) => [s.abbr, 88 - i])) : undefined,
     teamStats: ev.sides.map((s) => ({ team: s.abbr, stats: [{ name: 'fieldGoalsMade-fieldGoalsAttempted', value: '38-85' }, { name: 'fieldGoalPct', value: '45' }, { name: 'totalRebounds', value: '44' }, { name: 'totalTurnovers', value: '12' }] })),
     lastScore: ev.state === 'in' ? { text: 'Tyrese Maxey makes 26-foot three point jumper (Joel Embiid assists)', value: 3, team: ev.sides[0].abbr, period: 2, clock: '5:21', type: 'Three Point Jump Shot' } : null,
     syncedAt: new Date().toISOString() };

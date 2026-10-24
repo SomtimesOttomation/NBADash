@@ -4,6 +4,7 @@ import * as S from './store.js';
 import * as bridge from './bridge.js';
 import { displayCode } from './arenas.js';
 import { fmtValue } from './stats.js';
+import { calc } from './formulas.js';
 
 export const teamColor = (t) => (t && t.color ? `#${t.color}` : '#6b7280');
 
@@ -241,7 +242,7 @@ const rowSub = (r, showTeam) => [showTeam && r.team ? displayCode(r.team) : '', 
 // Card view: one card per category with the top players listed inside.
 export function leaderCardGrid(cards, { showTeam = false } = {}) {
   return h('div', { class: 'leaders-grid' }, cards.map((c) => h('section', { class: 'card leader-card' },
-    h('header', null, h('h3', null, c.title), h('small', null, c.unit)),
+    h('header', null, h('h3', null, h('span', calc(c.key, 'player'), c.title)), h('small', null, c.unit)),
     c.rows.length ? h('ol', null, c.rows.map((r, i) => h('li', { class: i === 0 ? 'first' : '' },
       h('span', { class: 'rk' }, i + 1),
       avatar(r.name, headshotUrl(r.id), i === 0 ? 44 : 32),
@@ -256,7 +257,7 @@ const ORD = ['Leader', '2nd', '3rd', '4th', '5th'];
 // Row view: each category is a heading followed by one centred row of player cards (1st to 5th).
 export function leaderRowSections(cards, { worst = false } = {}) {
   return h('div', { class: 'lrows' }, cards.map((c) => h('section', { class: 'lrow' },
-    h('div', { class: 'section-head' }, h('h2', null, c.title, h('small', null, c.unit))),
+    h('div', { class: 'section-head' }, h('h2', null, h('span', calc(c.key, 'player'), c.title), h('small', null, c.unit))),
     c.rows.length ? h('div', { class: 'pog-row' }, c.rows.map((r, i) => h('div', { class: `lcard ${i === 0 ? 'first' : ''}` },
       h('span', { class: 'pog-badge' }, i === 0 ? (worst ? '\u25be Worst' : '\u2605 Leader') : ORD[i]),
       avatar(r.name, headshotUrl(r.id), 64),

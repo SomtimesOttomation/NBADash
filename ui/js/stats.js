@@ -188,7 +188,24 @@ export function rankAll(players, ctxFor, top, { minMpg = 8, minGpShare = 0, wors
 export function leaders(agg, top = 3) { return rankAll(agg.players, () => agg, top); }
 
 // ---------------------------------------------------------------- league-wide, built one saved box score at a time
-export const LEAGUE_VERSION = 2;   // 2: rebuild once; boxes missing a team's player lines are no longer counted as done
+export const LEAGUE_VERSION = 3;   // 3: rebuild once to add counted possessions (Native ratings)
+
+// ---------------------------------------------------------------- possessions (team ratings formula setting)
+// Basketball-Reference / Dean Oliver: 0.4 x FTA and a weighted offensive-rebound adjustment, team and opponent averaged.
+export function possBref(T, O) {
+  const side = (A, B) => A.fga + 0.4 * A.fta - 1.07 * (A.oreb + B.dreb > 0 ? A.oreb / (A.oreb + B.dreb) : 0) * (A.fga - A.fgm) + A.tov;
+  return 0.5 * (side(T, O) + side(O, T));
+}
+// NBA.com-style estimate: FGA - ORB + TOV + 0.436 x FTA, team and opponent averaged.
+export function possNba(T, O) {
+  const side = (A) => A.fga - A.oreb + A.tov + 0.436 * A.fta;
+  return 0.5 * (side(T) + side(O));
+}
+export const RATING_METHODS = {
+  native: 'Native (counted possessions)',
+  bref: 'Basketball-Reference',
+  nba: 'NBA.com',
+};
 export const newLeague = () => ({ version: LEAGUE_VERSION, done: [], teams: {}, players: {} });
 
 // A box is usable once both teams have at least one player line with numbers in it.
@@ -199,9 +216,15 @@ export function leagueAdd(lg, box) {
   if (!boxComplete(box)) return false;
   for (let i = 0; i < 2; i++) {
     const mine = box.teams[i], theirs = box.teams[1 - i];
-    const te = lg.teams[mine.team] || (lg.teams[mine.team] = { games: 0, T: emptyTot(), O: emptyTot() });
+    const te = lg.teams[mine.team] || (lg.teams[mine.team] = { games: 0, T: emptyTot(), O: emptyTot(), nat: { o: 0, d: 0, counted: 0 } });
+    if (!te.nat) te.nat = { o: 0, d: 0, counted: 0 };
     te.games++;
-    addTot(te.T, teamTotals(mine)); addTot(te.O, teamTotals(theirs));
+    const gT = teamTotals(mine), gO = teamTotals(theirs);
+    addTot(te.T, gT); addTot(te.O, gO);
+    // Native: possessions counted from the play-by-play when the saved box score has them, else this game's estimate
+    const cp = box.poss || {};
+    const mineP = Number(cp[mine.team]), theirP = Number(cp[theirs.team]);
+    if (mineP > 0 && theirP > 0) { te.nat.o += mineP; te.nat.d += theirP; te.nat.counted++; } else { const e = possBref(gT, gO); te.nat.o += e; te.nat.d += e; }
     for (const p of mine.players) {
       if (!played(p)) continue;
       const l = lineOf(mine.labels, p.stats);

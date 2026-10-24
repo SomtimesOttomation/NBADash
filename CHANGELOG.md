@@ -2,15 +2,27 @@
 
 Changes are grouped by label: Feature, Bug/Fix, Redesign, Housekeeping. Every merged change lands under Unreleased first and moves to a version heading when that release is published.
 
+Release rhythm: changes are merged as they are done without changing VERSION, and released in batches on Mondays and Thursdays. Real user-facing bugs can be released right away.
+
 ## Unreleased
 
-### v0.11.0 (merged, not yet published)
+**Feature**
+- Hover any calculated stat to see its formula and reasoning.
+- New Ratings formula setting: Native (counted possessions), Basketball-Reference or NBA.com.
+
+**Bug/Fix**
+- Team ratings now count possessions the same way as player ratings.
+
+## Released
+
+### v0.11.0
 
 **Feature**
 - New Transactions tab, league-wide and on each team page, tracking trades, signings and waivers.
 - Roster shows a New tag for recent arrivals.
 
-## Released
+**Housekeeping**
+- Added a changelog and an architecture overview.
 
 ### v0.10.0
 **Feature**

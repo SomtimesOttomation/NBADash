@@ -3,26 +3,28 @@ import { h } from '../util.js';
 import { emptyState, teamLogo, teamName } from '../components.js';
 import { displayCode } from '../arenas.js';
 import { teamRows, teamCards, reportCard, fmtTeamValue } from '../teamstats.js';
+import { calc } from '../formulas.js';
+import { RATING_METHODS } from '../stats.js';
 
 const TAB_KEY = 'nbadash.rankingsTab', SHOW_KEY = 'nbadash.gradesEarly';
 let tab = 'leaders';
 let early = false;
 try { const v = localStorage.getItem(TAB_KEY); if (['leaders', 'losers', 'report'].includes(v)) tab = v; } catch (e) { /* ignore */ }
 try { early = localStorage.getItem(SHOW_KEY) === '1'; } catch (e) { /* ignore */ }
-let memo = { rev: -1, rows: null, report: null };
+let memo = { rev: -1, method: '', rows: null, report: null };
 
 // Grades unlock once Week 3 is over (Week 4 starts).
 export const gradesUnlockKey = () => S.weekDayKeys(4)[0];
 export const gradesUnlocked = () => S.todayKey() >= gradesUnlockKey();
 
 export function mount(ctx) { S.loadLeague().then(() => draw(ctx)); draw(ctx); }
-export function update(topics, ctx) { if (topics.has('league')) draw(ctx); }
+export function update(topics, ctx) { if (topics.has('league') || topics.has('settings')) draw(ctx); }
 
 const teamCell = (abbr) => h('a', { class: 'tr-team', href: `#/team/${abbr}` }, teamLogo(abbr, 22), h('b', null, displayCode(abbr)), h('small', null, teamName(abbr)));
 
 function cardGrid(cards) {
   return h('div', { class: 'leaders-grid' }, cards.map((c) => h('section', { class: 'card leader-card' },
-    h('header', null, h('h3', null, c.title), h('small', null, c.unit)),
+    h('header', null, h('h3', null, h('span', calc(c.key, 'team'), c.title)), h('small', null, c.unit)),
     c.rows.length ? h('ol', null, c.rows.map((r, i) => h('li', { class: i === 0 ? 'first' : '' },
       h('span', { class: 'rk' }, i + 1),
       teamLogo(r.abbr, i === 0 ? 40 : 28),
@@ -37,11 +39,17 @@ const gradeBadge = (g) => h('span', { class: gcls(g) }, g);
 function reportTable(rep) {
   const f1 = (v) => v.toFixed(1), sg = (v) => (v > 0 ? '+' : '') + v.toFixed(1);
   return h('div', { class: 'card tr-wrap' }, h('table', { class: 'tr-table' },
-    h('thead', null, h('tr', null, ['#', 'Team', 'Overall', 'Offense', 'Defense', 'Net', 'ORtg', 'DRtg', 'eFG%', 'GP'].map((t, i) => h('th', { class: i > 1 ? 'num' : '' }, t)))),
+    h('thead', null, h('tr', null, [['#'], ['Team'], ['Overall', 'grade'], ['Offense', 'grade'], ['Defense', 'grade'], ['Net', 'net'], ['ORtg', 'ortg'], ['DRtg', 'drtg'], ['eFG%', 'efg'], ['GP']].map(([t, k], i) => h('th', { class: i > 1 ? 'num' : '' }, k ? h('span', calc(k, 'team'), t) : t)))),
     h('tbody', null, rep.map((r) => h('tr', null,
       h('td', { class: 'rk' }, r.overall.rank), h('td', null, teamCell(r.abbr)),
       h('td', { class: 'num' }, gradeBadge(r.overall.grade)), h('td', { class: 'num' }, gradeBadge(r.offGrade)), h('td', { class: 'num' }, gradeBadge(r.defGrade)),
       h('td', { class: 'num' }, sg(r.net)), h('td', { class: 'num' }, f1(r.ortg)), h('td', { class: 'num' }, f1(r.drtg)), h('td', { class: 'num' }, f1(r.efg)), h('td', { class: 'num' }, r.games))))));
+}
+
+// "counted in 40 of 52 games" for the Native formula (older saves fall back to the estimate)
+function nativeShare(rows) {
+  const games = rows.reduce((a, r) => a + r.games, 0), counted = rows.reduce((a, r) => a + (r.counted || 0), 0);
+  return games ? `, counted in ${counted} of ${games} team games, estimated for the rest` : '';
 }
 
 function draw({ el }) {
@@ -61,7 +69,8 @@ function draw({ el }) {
   if (!lg || (!games && L.loading)) body = emptyState('Building team stats…', L.total ? `${L.n} of ${L.total} box scores` : '');
   else if (!games) body = emptyState('No saved box scores yet', 'Team rankings are built from saved box scores. Run Update everything in Settings.');
   else {
-    if (memo.rev !== L.rev || !memo.rows) memo = { rev: L.rev, rows: teamRows(lg), report: null };
+    const method = S.state.settings.ratingMethod || 'native';
+    if (memo.rev !== L.rev || memo.method !== method || !memo.rows) memo = { rev: L.rev, method, rows: teamRows(lg, method), report: null };
     if (tab === 'report') {
       const unlocked = gradesUnlocked();
       const show = unlocked || early;
@@ -82,7 +91,7 @@ function draw({ el }) {
     } else {
       const cards = teamCards(memo.rows, tab === 'losers', 5);
       body = h('div', null, h('p', { class: 'muted', style: { margin: '0 0 12px' } },
-        tab === 'losers' ? 'The five worst teams per category, the mirror image of Leaders.' : 'Top 5 teams per category. Teams with more games played get a small edge in close races. Ratings are points per 100 possessions (estimated); for allowed points and defensive rating, lower is better.',
+        tab === 'losers' ? 'The five worst teams per category, the mirror image of Leaders. ' : 'Top 5 teams per category. ', 'Teams with more games played get a ', h('span', calc('gpedge'), 'small edge'), ` in close races. Ratings are points per 100 possessions (formula: ${RATING_METHODS[method]}${method === 'native' ? nativeShare(memo.rows) : ''}; change it in Settings). Hover a category name for its formula.`,
         L.loading ? ` Updating… ${L.n} of ${L.total} new box scores.` : ''), cardGrid(cards));
     }
   }

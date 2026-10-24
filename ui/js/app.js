@@ -17,6 +17,7 @@ import * as weekV from './views/week.js';
 import * as compareV from './views/compare.js';
 import { initPlayerSearch } from './views/psearch.js';
 import { renderCompareBar } from './views/cmpbar.js';
+import { installCalcTips } from './formulas.js';
 
 const $ = (s) => document.querySelector(s);
 const view = $('#view');
@@ -133,7 +134,7 @@ setInterval(liveStatus, 15000);
 
 window.addEventListener('hashchange', route);
 S.init().then(() => {
-  themeIcon(); liveStatus(); route(); versionChip(); initPlayerSearch(); renderCompareBar($('#cmpbar'));
+  themeIcon(); liveStatus(); route(); versionChip(); initPlayerSearch(); renderCompareBar($('#cmpbar')); installCalcTips();
   const n = S.state.update.note;
   if (n) toast(n.ok ? `Updated to v${n.to}.` : `The update to v${n.to} did not work (${n.reason || 'unknown reason'}). v${n.from} was restored.`);
 }).catch((e) => {
