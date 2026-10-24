@@ -43,6 +43,12 @@ Out of the box NBADash **does not poll ESPN on its own**. It contacts ESPN only 
 
 You can opt in to automatic refresh in Settings. It shows a warning (ESPN publishes no limits for this API, and polling too often can get you rate-limited or blocked) and needs a confirmation. Once on, you control the cadence: live-score interval, idle scoreboard interval, how often finished days and standings/injuries are re-checked, and how fresh a sync treats saved team files, standings and injuries. Values are clamped to safe ranges and **Reset to defaults** restores them. Auto-watching favorite games and the startup season-history fill are only active in automatic mode. The sync values are also used by the nightly task, which reads them from your settings file.
 
+## Team Rankings and Report Card
+
+The Team Rankings tab ranks all 30 teams per category (Leaders and Losers tabs): point differential, scoring, offensive and defensive rating, net rating, shooting, rebounds, assists, steals, blocks and turnovers. Ratings are estimated points per 100 possessions.
+
+The Report Card tab gives each team an overall, offense and defense letter grade, curved against the rest of the league. Grades stay hidden until Week 3 is complete (from Nov 10); tick "Show grades anyway" to preview them early.
+
 ## Live game cards
 
 Live cards show the status ("Q2 5:14", "HALFTIME", "END Q1"). Once a box score has been loaded for a live game (the "Box score" button on the card, or auto-watch in automatic mode), the card also shows the latest basket: points and type (3PT, 2PT, FT), who scored, and when. It comes from the play-by-play that already ships with the box score, so it costs no extra request. ESPN does not flag timeouts or commercial breaks, only halftime and the end of a period.
