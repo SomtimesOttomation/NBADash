@@ -4,19 +4,38 @@ Changes are grouped by label: Feature, Bug/Fix, Redesign, Housekeeping. Every me
 
 ## Unreleased
 
-### v0.9.0 (merged, not yet published)
+### v0.11.0 (merged, not yet published)
 
+**Feature**
+- New Transactions tab, league-wide and on each team page, tracking trades, signings and waivers.
+- Roster shows a New tag for recent arrivals.
+
+## Released
+
+### v0.10.0
+**Feature**
+- Team pages now show a team grade square, click to reveal.
+- Teams and players with more games played get a small edge in Leaderboards and Team Rankings.
+
+**Redesign**
+- League Leaders renamed to Leaderboards.
+- Team roster now shows shooting, defense, turnovers, fouls and +/- per game.
+
+### v0.9.1
+**Bug/Fix**
+- Fixed bug with League Leaders missing stats from games finished the same day.
+
+### v0.9.0
 **Feature**
 - New Team Rankings tab with team Leaders and Losers by category, including offensive, defensive and net rating.
 - New Report Card tab with overall, offense and defense letter grades. Grades stay hidden until Week 3 is complete, with an optional "Show grades anyway" toggle.
 
-**Bug/Fix**
-- Fixed bug with League Leaders showing the lowest values first.
-
 **Housekeeping**
 - Reworded the refresh timing settings (Live Data Interval, Fetch Interval Outside of Live Games, Historical Data Sync). Defaults unchanged.
 
-## Released
+### v0.8.1
+**Bug/Fix**
+- Fixed bug with League Leaders showing the lowest values first.
 
 ### v0.8.0
 **Feature**
