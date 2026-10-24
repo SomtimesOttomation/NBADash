@@ -158,7 +158,16 @@ export const LEADER_DEFS = [
 // Ranks players for every category. ctxFor(p) gives that player's team context {games, T, O}.
 // minMpg: minutes per team game needed to appear at all; minGpShare: share of team games the player must have played.
 // worst: the Losers view. Same qualification, reversed order, and only the categories where a low number means a player is bad at the game.
-export function rankAll(players, ctxFor, top, { minMpg = 8, minGpShare = 0, worst = false } = {}) {
+// Small edge for a bigger sample: each value is pulled toward the pool average as if half an average game were added,
+// so a player with more games ranks ahead of one with fewer games and a near-identical number. The value shown is unchanged.
+export const GP_WEIGHT = 0.5;
+export function gpAdjust(rows, valueOf, gamesOf, k = GP_WEIGHT) {
+  const vals = rows.map(valueOf).filter(Number.isFinite);
+  const mean = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  return (r) => { const v = valueOf(r), n = gamesOf(r); return k > 0 && n > 0 ? (n * v + k * mean) / (n + k) : v; };
+}
+
+export function rankAll(players, ctxFor, top, { minMpg = 8, minGpShare = 0, worst = false, gpWeight = 0 } = {}) {
   return LEADER_DEFS.filter((d) => (worst ? d.loser : !d.loserOnly)).map((d) => {
     const rows = players
       .filter((p) => {
@@ -166,22 +175,28 @@ export function rankAll(players, ctxFor, top, { minMpg = 8, minGpShare = 0, wors
         return c && c.games > 0 && p.gp > 0 && p.gp >= Math.ceil(minGpShare * c.games) && p.tot.min / c.games >= minMpg && (!d.ok || d.ok(p, c));
       })
       .map((p) => ({ p, value: d.v(p, ctxFor(p)) }))
-      .filter((r) => Number.isFinite(r.value))
-      .sort((a, b) => ((!!d.low !== worst) ? a.value - b.value : b.value - a.value) || b.p.tot.min - a.p.tot.min)   // ties: the player with more minutes ranks first
+      .filter((r) => Number.isFinite(r.value));
+    const adj = gpAdjust(rows, (r) => r.value, (r) => r.p.gp, gpWeight);
+    rows.forEach((r) => { r.rank = adj(r); });
+    return { key: d.key, title: worst ? d.loser : d.title, unit: d.unit, f: d.f, suffix: d.suffix || '', signed: !!d.signed, note: d.note || '', rows: rows
+      .sort((a, b) => ((!!d.low !== worst) ? a.rank - b.rank : b.rank - a.rank) || b.p.tot.min - a.p.tot.min)   // ties: the player with more minutes ranks first
       .slice(0, top)
-      .map((r) => ({ id: r.p.id, name: r.p.name, team: r.p.team, jersey: r.p.jersey, value: r.value, text: d.text ? d.text(r.p) : '', sub: d.sub ? d.sub(r.p) : `${r.p.gp} GP` }));
-    return { key: d.key, title: worst ? d.loser : d.title, unit: d.unit, f: d.f, suffix: d.suffix || '', signed: !!d.signed, note: d.note || '', rows };
+      .map((r) => ({ id: r.p.id, name: r.p.name, team: r.p.team, jersey: r.p.jersey, value: r.value, text: d.text ? d.text(r.p) : '', sub: d.sub ? d.sub(r.p) : `${r.p.gp} GP` })) };
   });
 }
 
 export function leaders(agg, top = 3) { return rankAll(agg.players, () => agg, top); }
 
 // ---------------------------------------------------------------- league-wide, built one saved box score at a time
-export const LEAGUE_VERSION = 1;
+export const LEAGUE_VERSION = 2;   // 2: rebuild once; boxes missing a team's player lines are no longer counted as done
 export const newLeague = () => ({ version: LEAGUE_VERSION, done: [], teams: {}, players: {} });
 
+// A box is usable once both teams have at least one player line with numbers in it.
+export const boxComplete = (box) => !!box && Array.isArray(box.teams) && box.teams.length === 2
+  && box.teams.every((t) => Array.isArray(t.players) && t.players.some((p) => played(p)));
+
 export function leagueAdd(lg, box) {
-  if (!box || !Array.isArray(box.teams) || box.teams.length !== 2) return;
+  if (!boxComplete(box)) return false;
   for (let i = 0; i < 2; i++) {
     const mine = box.teams[i], theirs = box.teams[1 - i];
     const te = lg.teams[mine.team] || (lg.teams[mine.team] = { games: 0, T: emptyTot(), O: emptyTot() });
@@ -201,15 +216,16 @@ export function leagueAdd(lg, box) {
       if (p.starter) e.gs++;
     }
   }
+  return true;
 }
 
 // League leaders: stricter than the team view (10+ minutes a game, and at least half of the team's games played).
 export function leagueLeaders(lg, top = 5) {
-  return rankAll(Object.values(lg.players), (p) => (lg.teams[p.team] ? { games: lg.teams[p.team].games, T: lg.teams[p.team].T, O: lg.teams[p.team].O } : null), top, { minMpg: 10, minGpShare: 0.5 });
+  return rankAll(Object.values(lg.players), (p) => (lg.teams[p.team] ? { games: lg.teams[p.team].games, T: lg.teams[p.team].T, O: lg.teams[p.team].O } : null), top, { minMpg: 10, minGpShare: 0.5, gpWeight: GP_WEIGHT });
 }
 
 export function leagueLosers(lg, top = 5) {
-  return rankAll(Object.values(lg.players), (p) => (lg.teams[p.team] ? { games: lg.teams[p.team].games, T: lg.teams[p.team].T, O: lg.teams[p.team].O } : null), top, { minMpg: 10, minGpShare: 0.5, worst: true });
+  return rankAll(Object.values(lg.players), (p) => (lg.teams[p.team] ? { games: lg.teams[p.team].games, T: lg.teams[p.team].T, O: lg.teams[p.team].O } : null), top, { minMpg: 10, minGpShare: 0.5, worst: true, gpWeight: GP_WEIGHT });
 }
 
 export function fmtValue(v, card) {

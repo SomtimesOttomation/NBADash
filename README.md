@@ -19,7 +19,7 @@ a nightly cache sync, and a secret traffic counter (click the "NBA 2026-27" titl
 - `ui\` the web UI. Open `ui\index.html` through any static server for a mock-data preview in a normal browser.
 
 ## Player search and comparison
-Type in the search box next to League Leaders (press `/` to jump to it). Suggestions appear as you type: Tab or the
+Type in the search box next to Leaderboards (press `/` to jump to it). Suggestions appear as you type: Tab or the
 right arrow completes the top name, Enter opens it, and the box offers your recent players when it is empty. Names come
 from the cached rosters; if nothing matches there, ESPN's player search is asked (this also finds retired players).
 
@@ -42,6 +42,12 @@ The home page shows today and last night. Everything earlier lives under the **W
 Out of the box NBADash **does not poll ESPN on its own**. It contacts ESPN only when you press the refresh button (top right, or F5), open or refresh a box score, run a sync from Settings, or search for a player. The nightly scheduled task (if you registered one) is separate and still runs when you scheduled it.
 
 You can opt in to automatic refresh in Settings. It shows a warning (ESPN publishes no limits for this API, and polling too often can get you rate-limited or blocked) and needs a confirmation. Once on, you control the cadence: live-score interval, idle scoreboard interval, how often finished days and standings/injuries are re-checked, and how fresh a sync treats saved team files, standings and injuries. Values are clamped to safe ranges and **Reset to defaults** restores them. Auto-watching favorite games and the startup season-history fill are only active in automatic mode. The sync values are also used by the nightly task, which reads them from your settings file.
+
+## Team Rankings and Report Card
+
+The Team Rankings tab ranks all 30 teams per category (Leaders and Losers tabs): point differential, scoring, offensive and defensive rating, net rating, shooting, rebounds, assists, steals, blocks and turnovers. Ratings are estimated points per 100 possessions.
+
+The Report Card tab gives each team an overall, offense and defense letter grade, curved against the rest of the league. Grades stay hidden until Week 3 is complete (from Nov 10); tick "Show grades anyway" to preview them early.
 
 ## Live game cards
 
