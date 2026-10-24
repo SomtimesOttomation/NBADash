@@ -110,7 +110,7 @@ function haltBar() {
   const b = $('#haltbar');
   b.hidden = !S.state.halted;
   if (!S.state.halted) { b.replaceChildren(); return; }
-  b.replaceChildren(h('span', null, 'Traffic stopped. NBA Dash will not contact ESPN or GitHub until you resume.'),
+  b.replaceChildren(h('span', null, 'Data refresh stopped. NBA Dash will not fetch scores or stats until you resume.'),
     h('button', { class: 'btn primary', type: 'button', onclick: () => S.resumeTraffic().catch((e) => toast(e.message)) }, 'Resume'));
 }
 

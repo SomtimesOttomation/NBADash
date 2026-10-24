@@ -15,7 +15,7 @@ $script:Mutex = $null
 $script:Shared = $null
 $script:WorkerPs = $null
 $script:WorkerHandle = $null
-$script:Halted = $false          # kill switch pressed; only the person resumes, from inside the dash
+$script:Halted = $false          # launcher stop button pressed: no data fetching until the person resumes inside the dash
 
 $script:Allowed = @('teams.json', 'standings.json', 'injuries.json', 'sync-state.json', 'league-stats.json', 'transactions.json')
 $script:TuneDefaults = [ordered]@{ idleMinutes = @(10, 1, 120); oldDayHours = @(6, 1, 48); tableLiveMinutes = @(15, 5, 120); tableStaleHours = @(6, 1, 48); teamFreshHours = @(20, 1, 168); tableFreshHours = @(4, 1, 48); backfillDays = @(7, 1, 30) }
@@ -105,8 +105,7 @@ $script:LastUpdJson = ''
 $script:UpdateAvailable = $null
 function Start-Updater {
     param([string]$Action)
-    if ($script:Halted) { return $false }
-    if ($script:UpdProc -and -not $script:UpdProc.HasExited) { return $false }
+    if ($script:UpdProc -and -not $script:UpdProc.HasExited) { return $false }     # update checks are not data traffic: the stop button leaves them alone
     $cur = if ($env:NBADASH_FAKE_VERSION) { $env:NBADASH_FAKE_VERSION } else { $script:Version }    # test hook: pretend to be older
     Remove-Item $script:UpdResult -Force -ErrorAction SilentlyContinue
     $argsList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f (Join-Path $script:Root 'Update-NBADash.ps1')),
@@ -259,9 +258,9 @@ function Invoke-PageCommand {
     $a = $Msg.args
     $CacheDir = $script:CacheDir
     $utf8 = $script:Utf8
-    # after the kill switch nothing reaches ESPN or GitHub until the person resumes inside the dash
-    $fetching = @('watch.set', 'live.refresh', 'sync.run', 'player.search', 'update.check', 'update.stage', 'update.apply')
-    if ($script:Halted -and $fetching -contains $Msg.cmd) { ReplyError $Msg.id 'Traffic is stopped. Press Resume to allow fetching again.'; return }
+    # after the launcher's stop button no data is fetched until the person resumes inside the dash (update checks still work)
+    $fetching = @('watch.set', 'live.refresh', 'sync.run', 'player.search')
+    if ($script:Halted -and $fetching -contains $Msg.cmd) { ReplyError $Msg.id 'Data refresh is stopped. Press Resume to allow it again.'; return }
     switch ($Msg.cmd) {
         'init' {
             $st = Get-SyncState
@@ -356,7 +355,7 @@ function Invoke-PageCommand {
             $p = Join-Path $CacheDir "players\$id.json"
             $age = if (Test-Path $p) { ((Get-Date) - (Get-Item $p).LastWriteTime).TotalMinutes } else { 99999 }
             if ($age -lt 180 -or ($script:Halted -and (Test-Path $p))) { Reply $Msg.id ('{{"player":{0}}}' -f [IO.File]::ReadAllText($p, $utf8)); return }   # fresh enough
-            if ($script:Halted) { ReplyError $Msg.id 'Traffic is stopped. Press Resume to allow fetching again.'; return }
+            if ($script:Halted) { ReplyError $Msg.id 'Data refresh is stopped. Press Resume to allow it again.'; return }
             $script:Shared.Commands.Enqueue(@{ type = 'player'; id = $id })                                          # result arrives as a 'player' event
             if (Test-Path $p) { Reply $Msg.id ('{{"pending":true,"player":{0}}}' -f [IO.File]::ReadAllText($p, $utf8)) } else { Reply $Msg.id '{"pending":true}' }
         }
@@ -475,10 +474,10 @@ function Get-DashStatus {
 }
 
 function Stop-DashTraffic {
-    <# Kill switch: cancel syncs, update downloads and queued requests, pause the worker. Saved settings are not changed. #>
+    <# Launcher stop button: stop all traffic to data sources (running sync, queued data requests, live refresh) and pause the worker.
+       Update checks and downloads (GitHub) keep working. Saved settings are not changed. #>
     $script:Halted = $true
     try { if ($script:SyncProc -and -not $script:SyncProc.HasExited) { $script:SyncProc.Kill() } } catch { }
-    try { if ($script:UpdProc -and -not $script:UpdProc.HasExited) { $script:UpdProc.Kill() } } catch { }
     if ($script:Shared) {
         $script:Shared.Halted = $true
         $script:Shared.Paused = $true
