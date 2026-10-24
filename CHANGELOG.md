@@ -11,6 +11,7 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 - New Ratings formula setting: Native (counted possessions), Basketball-Reference or NBA.com.
 - Team Rankings adds Simple Rating System (SRS) and Strength of Schedule.
 - New Game Flow section on game pages: win probability and score margin charts, biggest swing, runs, droughts, lead changes, ties and clutch points.
+- New Form rating (DARKO-style) on Leaderboards and player pages, with an on/off switch in Settings > Data.
 
 **Bug/Fix**
 - Team ratings now count possessions the same way as player ratings.

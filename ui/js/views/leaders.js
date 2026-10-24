@@ -10,10 +10,10 @@ const TAB_KEY = 'nbadash.leadersTab';
 let tab = 'leaders';        // 'leaders' | 'losers'
 try { const v = localStorage.getItem(TAB_KEY); if (v === 'leaders' || v === 'losers') tab = v; } catch (e) { /* ignore */ }
 try { const v = localStorage.getItem(KEY); if (v === 'cards' || v === 'rows') mode = v; } catch (e) { /* storage can be unavailable */ }
-let memo = { rev: -1, tab: '', cards: null };
+let memo = { rev: -1, tab: '', form: null, cards: null };
 
 export function mount(ctx) { S.loadLeague().then(() => draw(ctx)); draw(ctx); }
-export function update(topics, ctx) { if (topics.has('league')) draw(ctx); }
+export function update(topics, ctx) { if (topics.has('league') || topics.has('settings')) draw(ctx); }
 
 function draw({ el }) {
   const L = S.state.league;
@@ -38,7 +38,8 @@ function draw({ el }) {
   if (!lg || (!games && L.loading)) body = emptyState('Building league stats\u2026', L.total ? `${L.n} of ${L.total} box scores` : '');
   else if (!games) body = emptyState('No saved box scores yet', 'League leaders are built from saved box scores. Run Update everything in Settings > Data.');
   else {
-    if (memo.rev !== L.rev || memo.tab !== tab || !memo.cards) memo = { rev: L.rev, tab, cards: (tab === 'losers' ? leagueLosers : leagueLeaders)(lg, 5) };
+    const form = S.state.settings.showForm !== false;
+    if (memo.rev !== L.rev || memo.tab !== tab || memo.form !== form || !memo.cards) memo = { rev: L.rev, tab, form, cards: (tab === 'losers' ? leagueLosers : leagueLeaders)(lg, 5, { form }) };
     const note = h('p', { class: 'muted', style: { margin: '0 0 12px' } },
       tab === 'losers' ? 'The five worst per category, the mirror image of Leaders. ' : 'Top 5 per category. ',
       'Players with more games get a ', h('span', calc('gpedge'), 'small edge'), ' in close races. Players need 10+ minutes a game and at least half of their team\u2019s games. Hover a category name for its formula.',
