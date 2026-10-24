@@ -408,3 +408,7 @@ a.plink:hover { color: var(--accent2); }
 .form-chip { font-size: 14px; }
 .form-chip b.pos { color: var(--good); }
 .form-chip b.neg { color: var(--live); }
+
+/* kill switch bar (DashLauncher) */
+.haltbar { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 8px 16px; background: color-mix(in srgb, var(--live) 14%, var(--surface)); border-bottom: 1px solid var(--line); font-size: 13px; }
+.haltbar[hidden] { display: none; }

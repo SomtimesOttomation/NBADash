@@ -20,6 +20,9 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 - Settings split into General, Data and Sync tabs.
 - Report Card grades now account for strength of schedule.
 
+**Housekeeping**
+- Reorganised the app so DashLauncher can host it as a tab. No visible change when run on its own.
+
 ## Released
 
 ### v0.11.0

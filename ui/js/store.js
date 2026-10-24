@@ -327,9 +327,17 @@ export async function setWatch(id, on) {
   try { await bridge.request('watch.set', { id, on }); } catch (e) { console.warn(e.message); }
 }
 
+// In DashLauncher the launcher's theme wins; standalone, the dash's own setting.
+export const inLauncher = () => state.hostMode === 'launcher';
 export function applyTheme() {
-  document.documentElement.dataset.theme = state.settings.theme || 'system';
+  document.documentElement.dataset.theme = (inLauncher() && state.hostTheme) ? state.hostTheme : (state.settings.theme || 'system');
   notify('theme');
+}
+
+// After the launcher's kill switch only the person resumes, from inside the dash.
+export async function resumeTraffic() {
+  await bridge.request('traffic.resume');
+  state.halted = false; notify('traffic');
 }
 
 export async function saveSettings(patch) {
@@ -537,7 +545,16 @@ export async function init() {
   state.version = info.version || '';
   state.sample = !!info.sample;
   state.update.note = info.updateNote || null;
+  state.hostMode = info.host?.mode || 'standalone';
+  state.hostTheme = info.host?.theme || '';
+  state.halted = !!info.halted;
   applyTheme();
+
+  // host events (dash contract): launcher theme, tab shown again, kill switch
+  bridge.on('host.theme', (d) => { state.hostTheme = (d && d.theme) || ''; applyTheme(); });
+  bridge.on('host.visible', () => { if (state.settings.autoRefresh && !state.halted) bridge.request('live.refresh').catch(() => {}); notify('visible'); });
+  bridge.on('host.hidden', () => notify('hidden'));
+  bridge.on('traffic', (d) => { state.halted = !!(d && d.stopped); notify('traffic'); });
 
   bridge.on('scoreboard', onScoreboard);
   bridge.on('box', (d) => { normBox(d.box); onBox(d); });

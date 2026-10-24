@@ -12,6 +12,7 @@ param(
     [Parameter(Mandatory)][string]$StageDir,
     [Parameter(Mandatory)][string]$WorkDir,
     [Parameter(Mandatory)][int]$ParentPid,
+    [string]$Relaunch = '',            # what to start afterwards: the dash's own .bat, or DashLauncher's when the update came from there
     [Parameter(Mandatory)][string]$OldVersion,
     [Parameter(Mandatory)][string]$NewVersion,
     [int]$OkWaitSeconds = 60
@@ -20,6 +21,10 @@ param(
 $ErrorActionPreference = 'Stop'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 $AppDir = [IO.Path]::GetFullPath($AppDir).TrimEnd('\', '/')
+if (-not $Relaunch) { $Relaunch = Join-Path $AppDir 'Start-NBADash.bat' }
+$Relaunch = [IO.Path]::GetFullPath($Relaunch)
+$relaunchDir = Split-Path $Relaunch
+$relaunchScript = [IO.Path]::GetFileNameWithoutExtension($Relaunch) + '.ps1'
 $StageDir = [IO.Path]::GetFullPath($StageDir).TrimEnd('\', '/')
 $logFile = Join-Path $WorkDir 'apply.log'
 $backupRoot = Join-Path $WorkDir 'backup'
@@ -62,10 +67,10 @@ function Restore-Backup {
 }
 
 function Start-App {
-    # Same launcher the user double-clicks: it re-checks lib\ and starts the hidden PowerShell host.
+    # Same entry point the person double-clicks (the dash's .bat, or DashLauncher's): it re-checks lib\ and starts the hidden host.
     $extra = @{}
     if ($PSVersionTable.PSEdition -ne 'Core' -or $IsWindows) { $extra.WindowStyle = 'Hidden' }     # (PowerShell 7 on Linux has no such switch: test runs only)
-    Start-Process -FilePath $env:ComSpec -ArgumentList '/c', ('"{0}"' -f (Join-Path $AppDir 'Start-NBADash.bat')) -WorkingDirectory $AppDir @extra
+    Start-Process -FilePath $env:ComSpec -ArgumentList '/c', ('"{0}"' -f $Relaunch) -WorkingDirectory $relaunchDir @extra
 }
 
 function Stop-App {
@@ -73,7 +78,7 @@ function Stop-App {
     try {
         $mine = $PID
         Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object {
-            $_.ProcessId -ne $mine -and $_.CommandLine -and $_.CommandLine -like "*$AppDir*Start-NBADash.ps1*"
+            $_.ProcessId -ne $mine -and $_.CommandLine -and ($_.CommandLine -like "*$AppDir*Start-NBADash.ps1*" -or $_.CommandLine -like "*$relaunchDir*$relaunchScript*")
         } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     } catch { }
 }

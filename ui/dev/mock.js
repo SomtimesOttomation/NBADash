@@ -131,12 +131,17 @@ function tick() {
   watch.forEach((id) => { const b = box(id); if (b) { count('boxscore', 463000); emit('box', { eventId: id, box: b }); } });
 }
 
-export function attach(e) { emit = e; setInterval(tick, 4000); }
+export function attach(e) { emit = e; setInterval(tick, 4000); window.__mockEmit = (ev, data) => emit(ev, data); }   // dev: simulate host events
 
 export async function request(cmd, args) {
   await new Promise((r) => setTimeout(r, 15));
   switch (cmd) {
-    case 'init': return { settings, sync: { running: false, lastRun: new Date().toISOString() }, cacheDir: '(mock)', version: '0.2.0', sample: true };
+    case 'init': {
+      const launcher = /[?&]launcher=1/.test(location.search);    // dev: preview the DashLauncher tab
+      return { settings, sync: { running: false, lastRun: new Date().toISOString() }, cacheDir: '(mock)', version: '0.2.0', sample: true,
+        host: launcher ? { mode: 'launcher', theme: 'dark', launcherVersion: '0.1.0' } : { mode: 'standalone', theme: '' }, halted: false };
+    }
+    case 'traffic.resume': setTimeout(() => emit && emit('traffic', { stopped: false }), 10); return true;
     case 'cache.read': {
       const p = args.path; let m;
       if (p === 'teams.json') return TEAMS;
