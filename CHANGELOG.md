@@ -7,6 +7,7 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 ## Unreleased
 
 **Feature**
+- Team pages get a Strength of Schedule square: how hard the remaining games are, ranked against the league.
 - New Free Agents page: recently waived players (including ESPN's official transactions list, loaded on request), a watch list with notes, and a notice when a watched player signs.
 
 **Bug/Fix**
