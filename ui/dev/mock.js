@@ -162,7 +162,7 @@ export async function request(cmd, args) {
         const ab = TEAMS.map((t) => t.abbr);
         return { syncedAt: new Date().toISOString(), conferences: [{ name: 'Eastern Conference', teams: mk(ab.slice(0, 15)) }, { name: 'Western Conference', teams: mk(ab.slice(15)) }] };
       }
-      if (p === 'injuries.json') return { syncedAt: new Date().toISOString(), teams: [{ team: 'TOR', teamId: '28', players: [{ id: '280', name: 'Raptors Player 1', status: 'Out', date: '', comment: 'Ankle' }, { id: '282', name: 'Raptors Player 3', status: 'Day-To-Day', comment: 'Knee' }] }] };
+      if (p === 'injuries.json') return { syncedAt: new Date().toISOString(), teams: [{ team: 'Toronto Raptors', teamId: String(TEAMS.find((t) => t.abbr === 'TOR').id), players: [{ id: '280', name: 'Raptors Player 1', status: 'Out', date: '', comment: 'Ankle' }, { id: '282', name: 'Raptors Player 3', status: 'Day-To-Day', comment: 'Knee' }] }] };
       return null;
     }
     case 'cache.list': return args.dir === 'boxscores'

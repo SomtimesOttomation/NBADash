@@ -10,10 +10,11 @@ let which = 0;
 
 export function mount(ctx) {
   S.ensureBox(ctx.arg).then((b) => { (b ? b.teams.map((t) => t.team) : []).forEach((a) => S.loadTeamFile(a)); draw(ctx); }).catch(() => draw(ctx));
+  S.loadInjuries();
   draw(ctx);
 }
 export function update(topics, ctx) {
-  if (topics.has('days') || topics.has(`box:${ctx.arg}`) || topics.has('watch') || topics.has('teamfile')) draw(ctx);
+  if (topics.has('days') || topics.has(`box:${ctx.arg}`) || topics.has('watch') || topics.has('teamfile') || topics.has('injuries')) draw(ctx);
 }
 
 function draw({ el, arg }) {
@@ -40,7 +41,7 @@ function draw({ el, arg }) {
     out.push(h('div', { class: 'tabs' }, box.teams.map((t, i) =>
       h('button', { class: which === i ? 'active' : '', type: 'button', onclick: () => { which = i; draw({ el, arg }); } }, displayCode(t.team)))));
     const t = box.teams[Math.min(which, box.teams.length - 1)];
-    if (t) out.push(playersTable(t));
+    if (t) out.push(playersTable(t, box));
     if (box.teamStats.length) out.push(teamStats(box));
   }
   el.replaceChildren(...out);
@@ -78,16 +79,39 @@ function lineScore(ev) {
       ...Array.from({ length: n }, (_, i) => h('td', null, s.lines[i] ?? '')), h('td', null, h('b', null, s.score ?? '')))))));
 }
 
-function playersTable(t) {
+// Box score for one team. ESPN lists only the players dressed for the game, so anyone else on the roster is added under
+// "Inactive", with the game's injury report (or the league injury list) saying why when it is known.
+function inactiveRows(t, box) {
+  const file = S.state.teamFiles.get(t.team);
+  const inBox = new Set(t.players.map((p) => String(p.id)));
+  const gameInj = new Map(box.injuries.filter((i) => i.team === t.team).map((i) => [String(i.id), i]));
+  const league = S.injuriesFor(t.team);
+  const fromRoster = file ? file.players.filter((p) => !inBox.has(String(p.id))) : [];
+  // injured players the roster file does not have yet (newly signed, or the roster has not been synced)
+  const extra = [...gameInj.values()].filter((i) => !inBox.has(String(i.id)) && !fromRoster.some((p) => String(p.id) === String(i.id)));
+  const people = [...fromRoster.map((p) => ({ id: p.id, name: p.name })), ...extra.map((i) => ({ id: i.id, name: i.name }))];
+  return people.map((p) => {
+    const g = gameInj.get(String(p.id));
+    const l = S.injuryOf(league, p.id, p.name);
+    const status = g ? g.status : l ? l.status : '';
+    const why = g ? [g.detail, g.returnDate ? `expected back ${fmtKey(String(g.returnDate).slice(0, 10).replace(/-/g, ''))}` : ''].filter(Boolean).join(' \u00b7 ') : (l && l.comment) || '';
+    const chip = status ? h('span', { class: `chip ${/out/i.test(status) ? 'out' : 'dtd'}` }, status) : h('span', { class: 'chip' }, 'Inactive');
+    return { status, el: (cols) => h('tr', { class: 'muted inactive' }, h('td', null, playerLink(p.id, p.name)), h('td', { colspan: cols, style: { textAlign: 'left' } }, chip, why ? ` ${why}` : '')) };
+  }).sort((a, b) => (a.status ? 0 : 1) - (b.status ? 0 : 1));
+}
+
+function playersTable(t, box) {
   const lab = t.labels;
   const starters = t.players.filter((p) => p.starter), bench = t.players.filter((p) => !p.starter);
   const row = (p) => p.dnp
     ? h('tr', { class: 'muted' }, h('td', null, playerLink(p.id, p.name)), h('td', { colspan: lab.length, style: { textAlign: 'left' } }, p.reason || 'DNP'))
     : h('tr', null, h('td', null, h('b', null, playerLink(p.id, p.name)), ' ', h('small', null, p.pos || '')), ...lab.map((_, i) => h('td', null, p.stats[i] ?? '')));
-  const group = (name) => h('tr', { class: `grp ${name === 'Bench' ? 'bench' : ''}` }, h('td', { colspan: lab.length + 1 }, name));
+  const group = (name, cls) => h('tr', { class: `grp ${cls || ''}` }, h('td', { colspan: lab.length + 1 }, name));
+  const inactive = box ? inactiveRows(t, box) : [];
   return h('div', { class: 'card scroll-x' }, h('table', { class: 'tbl' },
     h('thead', null, h('tr', null, h('th', null, 'Player'), lab.map((c) => h('th', null, c)))),
-    h('tbody', null, group('Starters'), starters.map(row), group('Bench'), bench.map(row),
+    h('tbody', null, group('Starters'), starters.map(row), group('Bench', 'bench'), bench.map(row),
+      inactive.length ? [group('Inactive (not dressed for this game)', 'inactive'), inactive.map((r) => r.el(lab.length))] : null,
       h('tr', null, h('td', null, h('b', null, 'Totals')), ...lab.map((_, i) => h('td', null, h('b', null, t.totals[i] ?? '')))))));
 }
 
