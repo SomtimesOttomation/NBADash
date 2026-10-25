@@ -115,6 +115,26 @@ function ConvertTo-NbaDay {
     return [pscustomobject]@{ date = $Ds; allFinal = $allFinal; fetchedAt = (Get-Date).ToUniversalTime().ToString('o'); events = $out }
 }
 
+function Get-NbaBoxInjuries {
+    # The game's injury report from the summary (already downloaded with the box score): who is out or questionable for each team.
+    param($Sum)
+    try {
+        return @(foreach ($t in @($Sum.injuries)) {
+            $abbr = [string]$t.team.abbreviation
+            foreach ($i in @($t.injuries)) {
+                if (-not $i -or -not $i.athlete) { continue }
+                $d = $i.details
+                $what = @([string]$d.type, [string]$d.detail) | Where-Object { $_ -and $_ -ne 'Not Specified' }
+                [pscustomobject]@{
+                    team = $abbr; id = [string]$i.athlete.id; name = [string]$i.athlete.displayName
+                    status = [string]$i.status; date = [string]$i.date
+                    detail = ($what -join ', '); returnDate = [string]$d.returnDate
+                }
+            }
+        })
+    } catch { return @() }
+}
+
 function Get-NbaFlow {
     # Game flow from the play-by-play and ESPN's win probability series, both already in the game summary (no extra request).
     # pts = [seconds elapsed, home margin, home win %]: every scoring change plus win-probability moves of 2 points or more.
@@ -257,6 +277,7 @@ function ConvertTo-NbaBox {
         teams = $boxTeams; teamStats = $teamStats; syncedAt = (Get-Date).ToString('s')
         poss = $(if ($gState -eq 'post') { Get-NbaPossessions $Sum } else { $null })
         flow = (Get-NbaFlow $Sum)
+        injuries = @(Get-NbaBoxInjuries $Sum)
     }
 }
 

@@ -101,12 +101,7 @@ function newArrivals(abbr) {
   return new Set(teamTx(abbr).filter((e) => e.to === abbr && e.date >= cutoff).map((e) => String(e.id)));
 }
 
-function injuryMap(abbr) {
-  const m = new Map();
-  const inj = S.state.injuries?.teams.find((x) => displayCode(x.team) === displayCode(abbr) || x.team === abbr);
-  inj?.players.forEach((p) => m.set(String(p.id), p));
-  return m;
-}
+const injuryMap = (abbr) => S.injuriesFor(abbr);
 
 function seasonOf(abbr) { return S.state.season.get(abbr); }
 
@@ -125,7 +120,7 @@ function roster(file) {
   const pctOf = (p, m, a) => { const s = stat.get(String(p.id)); return s && s.tot[a] > 0 ? (100 * s.tot[m] / s.tot[a]).toFixed(1) : '\u2013'; };
   const pmOf = (p) => { const s = stat.get(String(p.id)); if (!s || !s.gp) return '\u2013'; const v = s.tot.pm / s.gp; return (v > 0 ? '+' : '') + v.toFixed(1); };
   const row = (p) => {
-    const i = inj.get(String(p.id));
+    const i = S.injuryOf(inj, p.id, p.name);
     return h('tr', null,
       h('td', null, h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: '10px' } },
         avatar(p.name, p.headshot, 32),

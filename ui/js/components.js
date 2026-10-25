@@ -25,12 +25,32 @@ export function teamLogo(abbr, size = 40) {
 }
 
 // Player photo with an initials fallback. `src` may be empty.
+// Headshots: pages redraw often (every few box scores while league stats build, every scoreboard update), and each redraw
+// used to throw away half-loaded <img> elements, so pictures only showed once nothing was redrawing (e.g. after opening a
+// player). Each picture is now fetched once by a long-lived Image and reused; a redraw shows it as soon as it is ready.
+const shots = new Map();        // src -> { img: HTMLImageElement, ok: true|false|null, waiters: Set<HTMLImageElement> }
+function headshot(src) {
+  let e = shots.get(src);
+  if (!e) {
+    e = { img: new Image(), ok: null, waiters: new Set() };
+    e.img.decoding = 'async';
+    e.img.onload = () => { e.ok = true; e.waiters.forEach((el) => { el.src = src; el.hidden = false; }); e.waiters.clear(); };
+    e.img.onerror = () => { e.ok = false; e.waiters.forEach((el) => el.remove()); e.waiters.clear(); };
+    e.img.src = src;
+    shots.set(src, e);
+  }
+  return e;
+}
+
 export function avatar(name, src, size = 40) {
   const initials = String(name || '?').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
   const wrap = h('span', { class: 'avatar', style: { '--s': `${size}px` }, title: name }, initials);
   if (src) {
-    const img = h('img', { src, alt: '', width: size, height: size, decoding: 'async' });
-    img.addEventListener('error', () => img.remove());
+    const e = headshot(src);
+    if (e.ok === false) return wrap;                       // no picture for this player: keep the initials
+    const img = h('img', { alt: '', width: size, height: size, decoding: 'async' });
+    if (e.ok) img.src = src;
+    else { img.hidden = true; e.waiters.add(img); }       // filled in by the shared loader when it arrives
     wrap.append(img);
   }
   return wrap;

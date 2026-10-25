@@ -113,6 +113,7 @@ function normBox(b) {
     players: asArray(t.players).map((p) => ({ ...p, stats: asArray(p.stats) })),
   }));
   b.teamStats = asArray(b.teamStats).map((t) => ({ ...t, stats: asArray(t.stats) }));
+  b.injuries = asArray(b.injuries);
   return b;
 }
 
@@ -417,6 +418,18 @@ export async function loadStandings(force) {
   if (s) { s.conferences = asArray(s.conferences).map((c) => ({ ...c, teams: asArray(c.teams) })); state.standings = s; notify('standings'); }
   return state.standings;
 }
+
+// League injury list for one team: Map of player id -> { status, comment, date, name }, plus lookup by name.
+// The list names teams by ESPN id and full name (not the abbreviation), so match on those.
+export function injuriesFor(abbr) {
+  const m = new Map();
+  const t = team(abbr);
+  const rows = asArray(state.injuries?.teams).filter((x) => (x.teamId != null && state.byId.get(String(x.teamId))?.abbr === abbr)
+    || (t && x.team === t.name) || x.team === abbr);
+  for (const x of rows) for (const p of asArray(x.players)) { if (p.id) m.set(String(p.id), p); m.set(`name:${fold(p.name)}`, p); }
+  return m;
+}
+export const injuryOf = (map, id, name) => map.get(String(id)) || map.get(`name:${fold(name)}`) || null;
 
 export async function loadInjuries(force) {
   if (state.injuries && !force) return state.injuries;
