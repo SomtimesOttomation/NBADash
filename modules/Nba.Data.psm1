@@ -423,6 +423,26 @@ function Invoke-NbaWorker {
                     Save-NbaJsonFile (Join-Path $cache ("players\{0}.json" -f $cmd.id)) $pm
                     Push-NbaEvent $Shared 'player' @{ id = $cmd.id; player = $pm }
                 }
+                elseif ($cmd.type -eq 'txhistory') {
+                    # ESPN's official transaction notes, newest first, one page at a time with a pause between pages.
+                    # Only runs when the person presses the button; the result goes to cache\espn-transactions.json.
+                    $all = New-Object System.Collections.ArrayList
+                    $page = 1; $pages = 1; $ok = $true
+                    while ($page -le $pages -and $page -le 40 -and -not $Shared.Stop -and -not $Shared.Halted) {
+                        $res = Get-NbaJson -Shared $Shared -Url ("{0}/transactions?limit=100&page={1}" -f $Shared.EspnBase, $page) -Kind 'transactions'
+                        if (-not $res) { $ok = $false; break }
+                        $pages = [Math]::Max(1, [int]$res.pageCount)
+                        foreach ($t in @($res.transactions)) {
+                            if (-not $t -or -not $t.description) { continue }
+                            [void]$all.Add([pscustomobject]@{ date = [string]$t.date; description = [string]$t.description; team = [pscustomobject]@{ id = [string]$t.team.id; abbreviation = [string]$t.team.abbreviation } })
+                        }
+                        Push-NbaEvent $Shared 'txhistory' @{ running = $true; page = $page; pages = $pages; count = $all.Count }
+                        $page++
+                        if ($page -le $pages) { Start-Sleep -Milliseconds 1000 }
+                    }
+                    if ($all.Count -gt 0) { Save-NbaJsonFile (Join-Path $cache 'espn-transactions.json') ([pscustomobject]@{ fetchedAt = (Get-Date).ToString('s'); complete = $ok; entries = $all.ToArray() }) }
+                    Push-NbaEvent $Shared 'txhistory' @{ running = $false; ok = ($ok -and $all.Count -gt 0); count = $all.Count; error = $(if ($ok) { '' } else { [string]$Shared.LastError }) }
+                }
                 elseif ($cmd.type -eq 'psearch' -and $cmd.q) {
                     $url = "{0}/search?query={1}&limit=8&type=player&sport=basketball&league=nba" -f $Shared.EspnCommonBase, [Uri]::EscapeDataString([string]$cmd.q)
                     $res = Get-NbaJson -Shared $Shared -Url $url -Kind 'search'

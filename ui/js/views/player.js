@@ -8,11 +8,12 @@ import { calc } from '../formulas.js';
 
 export function mount(ctx) {
   S.loadPlayer(ctx.arg);
+  S.loadFreeAgents();
   if (S.state.settings.showForm !== false) S.loadLeague();
   draw(ctx);
 }
 export function update(topics, ctx) {
-  if (topics.has(`player:${ctx.arg}`) || topics.has('compare') || topics.has('teams') || topics.has('league') || topics.has('settings')) draw(ctx);
+  if (topics.has(`player:${ctx.arg}`) || topics.has('compare') || topics.has('teams') || topics.has('league') || topics.has('settings') || topics.has('fa')) draw(ctx);
 }
 
 const TILES = ['PTS', 'REB', 'AST', 'STL', 'BLK', 'FG%', '3P%', 'FT%'];
@@ -122,7 +123,9 @@ function draw({ el, arg }) {
       h('h1', null, b.name),
       h('div', { class: 'meta' }, [b.team ? displayCode(b.team) : '', b.pos, b.jersey ? `#${b.jersey}` : ''].filter(Boolean).join(' · ')),
       formChip(arg),
-      h('div', { style: { marginTop: '12px' } }, cmpBtn)),
+      h('div', { style: { marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap' } }, cmpBtn,
+        h('button', { class: 'btn', type: 'button', title: 'Track this player on the Free Agents page and get told when he signs somewhere',
+          onclick: () => S.toggleWatchFA({ id: arg, name: b.name, lastTeam: b.team }) }, S.isWatchedFA(arg) ? '\u2605 Watching (free agents)' : '\u2606 Watch as free agent'))),
     h('div', { class: 'pl-right scroll-x' }, bioTable(b)));
   const stale = e.loading ? h('small', { class: 'muted' }, 'Refreshing from ESPN…') : null;
   el.replaceChildren(top, ...(stale ? [stale] : []), seasonTables(p), history(p));

@@ -1,10 +1,11 @@
 import * as S from '../store.js';
 import { h, fmtKey } from '../util.js';
 import { gameCard, sortEvents, sectionHead, emptyState, skeletonCards } from '../components.js';
+import { signedNotice } from './freeagents.js';
 
-export function mount(ctx) { draw(ctx); S.loadDay(S.todayKey()); S.loadDay(S.yesterdayKey()); }
+export function mount(ctx) { draw(ctx); S.loadDay(S.todayKey()); S.loadDay(S.yesterdayKey()); S.loadFreeAgents().then(() => draw(ctx)); }
 export function update(topics, ctx) {
-  if (['days', 'favorites', 'watch', 'teams', 'sync', 'box'].some((t) => topics.has(t))) draw(ctx);
+  if (['days', 'favorites', 'watch', 'teams', 'sync', 'box', 'fa'].some((t) => topics.has(t))) draw(ctx);
 }
 
 function section(key, title, ctx) {
@@ -35,6 +36,8 @@ function draw({ el }) {
       h('button', { class: 'btn', type: 'button', onclick: () => import('./settings.js').then((m) => m.openSettings()) }, 'Automatic refresh options')));
   }
   if (!sections.length) out.push(S.state.ready ? emptyState('Nothing cached yet', S.state.settings.autoRefresh ? 'Run a sync (settings) or wait for live scores to load.' : 'Press the refresh button (top right) or run a full sync to download scores and teams.') : skeletonCards(6));
+  const fa = signedNotice();
+  if (fa) out.unshift(fa);
   el.replaceChildren(...out);
   void favGames;
 }

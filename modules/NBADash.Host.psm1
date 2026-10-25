@@ -17,7 +17,7 @@ $script:WorkerPs = $null
 $script:WorkerHandle = $null
 $script:Halted = $false          # launcher stop button pressed: no data fetching until the person resumes inside the dash
 
-$script:Allowed = @('teams.json', 'standings.json', 'injuries.json', 'sync-state.json', 'league-stats.json', 'transactions.json')
+$script:Allowed = @('teams.json', 'standings.json', 'injuries.json', 'sync-state.json', 'league-stats.json', 'transactions.json', 'freeagents.json', 'espn-transactions.json')
 $script:TuneDefaults = [ordered]@{ idleMinutes = @(10, 1, 120); oldDayHours = @(6, 1, 48); tableLiveMinutes = @(15, 5, 120); tableStaleHours = @(6, 1, 48); teamFreshHours = @(20, 1, 168); tableFreshHours = @(4, 1, 48); backfillDays = @(7, 1, 30) }
 
 # ---------------------------------------------------------------- page messages
@@ -259,7 +259,7 @@ function Invoke-PageCommand {
     $CacheDir = $script:CacheDir
     $utf8 = $script:Utf8
     # after the launcher's stop button no data is fetched until the person resumes inside the dash (update checks still work)
-    $fetching = @('watch.set', 'live.refresh', 'sync.run', 'player.search')
+    $fetching = @('watch.set', 'live.refresh', 'sync.run', 'player.search', 'txhistory.fetch')
     if ($script:Halted -and $fetching -contains $Msg.cmd) { ReplyError $Msg.id 'Data refresh is stopped. Press Resume to allow it again.'; return }
     switch ($Msg.cmd) {
         'init' {
@@ -287,9 +287,10 @@ function Invoke-PageCommand {
             Reply $Msg.id (ConvertTo-Json -InputObject $names -Compress)
         }
         'cache.write' {
-            # the only file the page may write: its running league totals
-            if ($a.path -ne 'league-stats.json' -or -not $a.text -or ([string]$a.text).Length -gt 8000000) { ReplyError $Msg.id 'write not allowed'; return }
-            $p = Join-Path $CacheDir 'league-stats.json'
+            # the only files the page may write: its running league totals and the free agent watch list
+            $limits = @{ 'league-stats.json' = 8000000; 'freeagents.json' = 500000 }
+            if (-not $limits.ContainsKey([string]$a.path) -or -not $a.text -or ([string]$a.text).Length -gt $limits[[string]$a.path]) { ReplyError $Msg.id 'write not allowed'; return }
+            $p = Join-Path $CacheDir ([string]$a.path)
             [IO.File]::WriteAllText("$p.tmp", [string]$a.text, $utf8)
             Move-Item -Path "$p.tmp" -Destination $p -Force
             Reply $Msg.id 'true'
@@ -343,6 +344,7 @@ function Invoke-PageCommand {
         }
         'schedule.remove' { Reply $Msg.id ((Set-NightlyTask -Time '' -Remove $true) | ConvertTo-Json -Compress) }
         'live.refresh' { $script:Shared.RefreshNow = $true; Reply $Msg.id 'true' }
+        'txhistory.fetch' { $script:Shared.Commands.Enqueue(@{ type = 'txhistory' }); Reply $Msg.id 'true' }
         'sync.run' {
             $mode = if ($a.mode -in 'favorites', 'all', 'force', 'team', 'history', 'historyBoxes') { $a.mode } else { 'favorites' }
             $team = [string]$a.team

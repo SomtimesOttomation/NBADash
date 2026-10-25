@@ -3,6 +3,7 @@ import * as bridge from './bridge.js';
 import { etKey, addDaysKey, asArray, fmtKey } from './util.js';
 import { toEspnCode } from './arenas.js';
 import { aggregate, newLeague, leagueAdd, LEAGUE_VERSION } from './stats.js';
+import { parseAll } from './txparse.js';
 
 // user-adjustable timing: [default, min, max, label, unit, help]
 export const TUNING = {
@@ -170,7 +171,7 @@ function onSync(d) {
   const wasRunning = state.sync.running;
   state.sync = { ...state.sync, ...d };
   if (wasRunning && d.running === false) state.sync.finishedAt = Date.now();
-  if (d.running === false) { state.season.clear(); loadLeague(); refreshCachedBoxes(); refreshCachedDays(); loadStandings(true); loadInjuries(true); loadTransactions(true); state.teamFiles.clear(); playerIndex = null; }
+  if (d.running === false) { state.season.clear(); loadLeague(); refreshCachedBoxes(); refreshCachedDays(); loadStandings(true); loadInjuries(true); loadTransactions(true); state.teamFiles.clear(); setTimeout(() => checkFASigned().catch(() => {}), 0); playerIndex = null; }
   notify('sync');
 }
 
@@ -403,6 +404,69 @@ function autoHistory() {
   }
 }
 
+// ---- free agent watch: players waived or released and not on any NBA roster, plus players the person chose to watch ----
+// Saved in cache\freeagents.json: { watch: { id: { name, lastTeam, added, note, signedTeam, signedAt, seen } } }
+// ESPN's official transaction notes (fetched only when the person presses the button), read into one move per player.
+export async function loadEspnTx(force) {
+  if (state.espnTx && !force) return state.espnTx;
+  const f = await readCache('espn-transactions.json');
+  const entries = asArray(f && f.entries).map((e) => ({ ...e, team: e.team || {} }));
+  state.espnTx = { fetchedAt: f ? f.fetchedAt : '', complete: f ? f.complete !== false : false, count: entries.length,
+    moves: parseAll(entries).sort((a, b) => String(b.date).localeCompare(String(a.date))) };
+  notify('fa');
+  return state.espnTx;
+}
+export async function fetchEspnTx() {
+  state.txh = { running: true, page: 0, pages: 0, count: 0 }; notify('fa');
+  await bridge.request('txhistory.fetch');
+}
+
+export async function loadFreeAgents() {
+  if (state.fa) return state.fa;
+  const f = await readCache('freeagents.json');
+  state.fa = { watch: (f && f.watch && typeof f.watch === 'object') ? f.watch : {} };
+  notify('fa');
+  return state.fa;
+}
+async function saveFreeAgents() {
+  try { await bridge.request('cache.write', { path: 'freeagents.json', text: JSON.stringify({ version: 1, watch: state.fa.watch }) }); } catch (e) { console.warn('free agents save failed', e.message); }
+}
+export const isWatchedFA = (id) => !!(state.fa && state.fa.watch[String(id)]);
+export async function toggleWatchFA(p) {
+  await loadFreeAgents();
+  const id = String(p.id);
+  if (state.fa.watch[id]) delete state.fa.watch[id];
+  else state.fa.watch[id] = { name: p.name, lastTeam: p.lastTeam || '', added: todayKey(), note: '' };
+  notify('fa'); await saveFreeAgents();
+}
+export async function setFANote(id, note) {
+  await loadFreeAgents();
+  const w = state.fa.watch[String(id)]; if (!w) return;
+  w.note = String(note || '').slice(0, 300); await saveFreeAgents(); notify('fa');
+}
+export async function dismissFASigned(id) {
+  const w = state.fa && state.fa.watch[String(id)]; if (!w) return;
+  w.seen = true; await saveFreeAgents(); notify('fa');
+}
+// Where every player is right now, from the saved rosters: id -> team abbreviation.
+export async function rosterIndex() {
+  const idx = await buildPlayerIndex();
+  return new Map(idx.map((p) => [p.id, p.abbr]));
+}
+// Marks watched players who now appear on a roster as signed (once), so Home can say so. Returns true when anything changed.
+export async function checkFASigned() {
+  await loadFreeAgents();
+  const where = await rosterIndex();
+  let changed = false;
+  for (const [id, w] of Object.entries(state.fa.watch)) {
+    const team = where.get(id);
+    if (team && team !== w.lastTeam && team !== w.signedTeam) { w.signedTeam = team; w.signedAt = todayKey(); w.seen = false; changed = true; }
+    if (!team && w.signedTeam) { delete w.signedTeam; delete w.signedAt; changed = true; }      // released again
+  }
+  if (changed) { await saveFreeAgents(); notify('fa'); }
+  return changed;
+}
+
 export async function loadTeamFile(abbr) {
   if (state.teamFiles.has(abbr)) return state.teamFiles.get(abbr);
   const f = await readCache(`teams/${abbr}.json`);
@@ -568,6 +632,7 @@ export async function init() {
   bridge.on('host.visible', () => { if (state.settings.autoRefresh && !state.halted) bridge.request('live.refresh').catch(() => {}); notify('visible'); });
   bridge.on('host.hidden', () => notify('hidden'));
   bridge.on('traffic', (d) => { state.halted = !!(d && d.stopped); notify('traffic'); });
+  bridge.on('txhistory', (d) => { state.txh = d; notify('fa'); if (d && !d.running) loadEspnTx(true); });
 
   bridge.on('scoreboard', onScoreboard);
   bridge.on('box', (d) => { normBox(d.box); onBox(d); });
