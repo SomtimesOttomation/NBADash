@@ -23,6 +23,7 @@ const started = Date.now();
 let syncing = false;
 let leagueFile = null;
 let faFile = null;
+let espnTxFile = null;
 
 function rng(seed) { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
 
@@ -142,6 +143,18 @@ export async function request(cmd, args) {
       return { settings, sync: { running: false, lastRun: new Date().toISOString() }, cacheDir: '(mock)', version: '0.2.0', sample: true,
         host: launcher ? { mode: 'launcher', theme: 'dark', launcherVersion: '0.1.0' } : { mode: 'standalone', theme: '' }, halted: false };
     }
+    case 'txhistory.fetch': {   // dev: two fake pages of ESPN's transaction notes
+      const d = (n) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10) + 'T07:00Z';
+      const entries = [
+        { date: d(1), description: 'Signed G Sean Pedulla to a two-way contract.', team: { id: '27', abbreviation: 'SAC' } },
+        { date: d(7), description: 'Waived Gs Bruce Brown and Dink Pate.', team: { id: '19', abbreviation: 'NY' } },
+        { date: d(7), description: 'Waived G Raptors Player 9 and F Kennedy Chandler.', team: { id: '28', abbreviation: 'TOR' } },
+        { date: d(7), description: 'Signed F Oso Ighodaro to a multiyear contract extension. Claimed F Drew Timme off waivers.', team: { id: '24', abbreviation: 'PHX' } },
+      ];
+      setTimeout(() => emit('txhistory', { running: true, page: 1, pages: 2, count: 2 }), 50);
+      setTimeout(() => { espnTxFile = { fetchedAt: new Date().toISOString(), complete: true, entries }; emit('txhistory', { running: false, ok: true, count: entries.length }); }, 400);
+      return true;
+    }
     case 'traffic.resume': setTimeout(() => emit && emit('traffic', { stopped: false }), 10); return true;
     case 'cache.read': {
       const p = args.path; let m;
@@ -151,6 +164,7 @@ export async function request(cmd, args) {
       if ((m = p.match(/^teams\/(\w+)\.json$/))) return TEAMS.some((t) => t.abbr === m[1]) ? teamFile(m[1]) : null;
       if (p === 'league-stats.json') return leagueFile;
       if (p === 'freeagents.json') return faFile;
+      if (p === 'espn-transactions.json') return espnTxFile;
       if (p === 'transactions.json') {
         const d = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
         return { updatedAt: new Date().toISOString(), events: [

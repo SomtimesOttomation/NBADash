@@ -7,7 +7,7 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 ## Unreleased
 
 **Feature**
-- New Free Agents page: recently waived players, a watch list with notes, and a notice when a watched player signs.
+- New Free Agents page: recently waived players (including ESPN's official transactions list, loaded on request), a watch list with notes, and a notice when a watched player signs.
 
 **Bug/Fix**
 - Fixed bug with injury tags not showing on team rosters.

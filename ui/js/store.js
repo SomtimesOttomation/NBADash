@@ -3,6 +3,7 @@ import * as bridge from './bridge.js';
 import { etKey, addDaysKey, asArray, fmtKey } from './util.js';
 import { toEspnCode } from './arenas.js';
 import { aggregate, newLeague, leagueAdd, LEAGUE_VERSION } from './stats.js';
+import { parseAll } from './txparse.js';
 
 // user-adjustable timing: [default, min, max, label, unit, help]
 export const TUNING = {
@@ -405,6 +406,21 @@ function autoHistory() {
 
 // ---- free agent watch: players waived or released and not on any NBA roster, plus players the person chose to watch ----
 // Saved in cache\freeagents.json: { watch: { id: { name, lastTeam, added, note, signedTeam, signedAt, seen } } }
+// ESPN's official transaction notes (fetched only when the person presses the button), read into one move per player.
+export async function loadEspnTx(force) {
+  if (state.espnTx && !force) return state.espnTx;
+  const f = await readCache('espn-transactions.json');
+  const entries = asArray(f && f.entries).map((e) => ({ ...e, team: e.team || {} }));
+  state.espnTx = { fetchedAt: f ? f.fetchedAt : '', complete: f ? f.complete !== false : false, count: entries.length,
+    moves: parseAll(entries).sort((a, b) => String(b.date).localeCompare(String(a.date))) };
+  notify('fa');
+  return state.espnTx;
+}
+export async function fetchEspnTx() {
+  state.txh = { running: true, page: 0, pages: 0, count: 0 }; notify('fa');
+  await bridge.request('txhistory.fetch');
+}
+
 export async function loadFreeAgents() {
   if (state.fa) return state.fa;
   const f = await readCache('freeagents.json');
@@ -616,6 +632,7 @@ export async function init() {
   bridge.on('host.visible', () => { if (state.settings.autoRefresh && !state.halted) bridge.request('live.refresh').catch(() => {}); notify('visible'); });
   bridge.on('host.hidden', () => notify('hidden'));
   bridge.on('traffic', (d) => { state.halted = !!(d && d.stopped); notify('traffic'); });
+  bridge.on('txhistory', (d) => { state.txh = d; notify('fa'); if (d && !d.running) loadEspnTx(true); });
 
   bridge.on('scoreboard', onScoreboard);
   bridge.on('box', (d) => { normBox(d.box); onBox(d); });
