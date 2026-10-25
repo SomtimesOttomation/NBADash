@@ -412,3 +412,14 @@ a.plink:hover { color: var(--accent2); }
 /* kill switch bar (DashLauncher) */
 .haltbar { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 8px 16px; background: color-mix(in srgb, var(--live) 14%, var(--surface)); border-bottom: 1px solid var(--line); font-size: 13px; }
 .haltbar[hidden] { display: none; }
+
+/* free agents */
+.tbl.fa th, .tbl.fa td { text-align: left; }
+.fa-name { display: inline-flex; align-items: center; gap: 8px; }
+.fa-star { font-size: 16px; }
+.fa-star.on { color: #f5a524; }
+.fa-note { width: 200px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--text); font: inherit; font-size: 12.5px; }
+.fa-notice { margin-bottom: 18px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+/* six nav links: tighten earlier, and drop the brand text on narrow windows */
+@media (max-width: 1440px) { #topbar { gap: 10px; } .nav a { padding: 6px 7px; font-size: 13px; } .psearch input { width: 160px; } }
+@media (max-width: 1180px) { .brand-text { display: none; } .psearch input { width: 130px; } .nav { gap: 0; } }

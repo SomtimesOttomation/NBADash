@@ -22,6 +22,7 @@ const stats = { requests: 0, bytes: 0, wireBytes: 0, errors: 0, byKind: {} };
 const started = Date.now();
 let syncing = false;
 let leagueFile = null;
+let faFile = null;
 
 function rng(seed) { let s = seed; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
 
@@ -149,6 +150,7 @@ export async function request(cmd, args) {
       if ((m = p.match(/^boxscores\/(\d+)\.json$/))) return box(m[1]);
       if ((m = p.match(/^teams\/(\w+)\.json$/))) return TEAMS.some((t) => t.abbr === m[1]) ? teamFile(m[1]) : null;
       if (p === 'league-stats.json') return leagueFile;
+      if (p === 'freeagents.json') return faFile;
       if (p === 'transactions.json') {
         const d = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
         return { updatedAt: new Date().toISOString(), events: [
@@ -171,7 +173,7 @@ export async function request(cmd, args) {
     case 'box.get': { const b = box(args.id); if (b) count('boxscore', 463000); return b; }
     case 'watch.set': if (args.on) watch.add(args.id); else watch.delete(args.id); return true;
     case 'settings.save': settings = args.settings; return true;
-    case 'cache.write': leagueFile = JSON.parse(args.text); return true;
+    case 'cache.write': if (args.path === 'freeagents.json') faFile = JSON.parse(args.text); else leagueFile = JSON.parse(args.text); return true;
     case 'sync.cancel': return true;
     case 'schedule.get': return { ...nightly };
     case 'schedule.set': nightly = { exists: true, time: args.time, state: 'Ready' }; return { ok: true, ...nightly, message: 'Registered' };

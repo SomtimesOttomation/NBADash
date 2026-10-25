@@ -170,7 +170,7 @@ function onSync(d) {
   const wasRunning = state.sync.running;
   state.sync = { ...state.sync, ...d };
   if (wasRunning && d.running === false) state.sync.finishedAt = Date.now();
-  if (d.running === false) { state.season.clear(); loadLeague(); refreshCachedBoxes(); refreshCachedDays(); loadStandings(true); loadInjuries(true); loadTransactions(true); state.teamFiles.clear(); playerIndex = null; }
+  if (d.running === false) { state.season.clear(); loadLeague(); refreshCachedBoxes(); refreshCachedDays(); loadStandings(true); loadInjuries(true); loadTransactions(true); state.teamFiles.clear(); setTimeout(() => checkFASigned().catch(() => {}), 0); playerIndex = null; }
   notify('sync');
 }
 
@@ -401,6 +401,54 @@ function autoHistory() {
   for (let k = SEASON_START; k <= last; k = addDaysKey(k, 1)) {
     if (!have.has(k)) { setTimeout(() => { if (!state.sync.running) runSync('history'); }, 6000); return; }
   }
+}
+
+// ---- free agent watch: players waived or released and not on any NBA roster, plus players the person chose to watch ----
+// Saved in cache\freeagents.json: { watch: { id: { name, lastTeam, added, note, signedTeam, signedAt, seen } } }
+export async function loadFreeAgents() {
+  if (state.fa) return state.fa;
+  const f = await readCache('freeagents.json');
+  state.fa = { watch: (f && f.watch && typeof f.watch === 'object') ? f.watch : {} };
+  notify('fa');
+  return state.fa;
+}
+async function saveFreeAgents() {
+  try { await bridge.request('cache.write', { path: 'freeagents.json', text: JSON.stringify({ version: 1, watch: state.fa.watch }) }); } catch (e) { console.warn('free agents save failed', e.message); }
+}
+export const isWatchedFA = (id) => !!(state.fa && state.fa.watch[String(id)]);
+export async function toggleWatchFA(p) {
+  await loadFreeAgents();
+  const id = String(p.id);
+  if (state.fa.watch[id]) delete state.fa.watch[id];
+  else state.fa.watch[id] = { name: p.name, lastTeam: p.lastTeam || '', added: todayKey(), note: '' };
+  notify('fa'); await saveFreeAgents();
+}
+export async function setFANote(id, note) {
+  await loadFreeAgents();
+  const w = state.fa.watch[String(id)]; if (!w) return;
+  w.note = String(note || '').slice(0, 300); await saveFreeAgents(); notify('fa');
+}
+export async function dismissFASigned(id) {
+  const w = state.fa && state.fa.watch[String(id)]; if (!w) return;
+  w.seen = true; await saveFreeAgents(); notify('fa');
+}
+// Where every player is right now, from the saved rosters: id -> team abbreviation.
+export async function rosterIndex() {
+  const idx = await buildPlayerIndex();
+  return new Map(idx.map((p) => [p.id, p.abbr]));
+}
+// Marks watched players who now appear on a roster as signed (once), so Home can say so. Returns true when anything changed.
+export async function checkFASigned() {
+  await loadFreeAgents();
+  const where = await rosterIndex();
+  let changed = false;
+  for (const [id, w] of Object.entries(state.fa.watch)) {
+    const team = where.get(id);
+    if (team && team !== w.lastTeam && team !== w.signedTeam) { w.signedTeam = team; w.signedAt = todayKey(); w.seen = false; changed = true; }
+    if (!team && w.signedTeam) { delete w.signedTeam; delete w.signedAt; changed = true; }      // released again
+  }
+  if (changed) { await saveFreeAgents(); notify('fa'); }
+  return changed;
 }
 
 export async function loadTeamFile(abbr) {
