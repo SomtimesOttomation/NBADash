@@ -6,6 +6,12 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 
 ## Unreleased
 
+_Nothing yet._
+
+## Released
+
+### v0.12.0
+
 **Feature**
 - Hover any calculated stat to see its formula and reasoning.
 - New Ratings formula setting: Native (counted possessions), Basketball-Reference or NBA.com.
@@ -23,8 +29,6 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 
 **Housekeeping**
 - Reorganised the app so DashLauncher can host it as a tab. No visible change when run on its own.
-
-## Released
 
 ### v0.11.0
 
