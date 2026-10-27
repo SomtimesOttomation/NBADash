@@ -443,3 +443,6 @@ a.plink:hover { color: var(--accent2); }
 .navpill { border-radius: 0; }
 .np-btn { border-radius: 4px; }
 .navpill .psearch input { border-radius: 4px; }
+/* flush with the week bar: no gap above, sharing the week bar's bottom border */
+.navpill-row { padding: 0 16px 10px; }
+.navpill { border-top: 0; margin-top: -1px; background: var(--surface); }
