@@ -446,3 +446,7 @@ a.plink:hover { color: var(--accent2); }
 /* flush with the week bar: no gap above, sharing the week bar's bottom border */
 .navpill-row { padding: 0 16px 10px; }
 .navpill { border-top: 0; margin-top: -1px; background: var(--surface); }
+/* top border back, matching the sides; bolder back/forward chevrons in the same 34px buttons */
+.navpill { border-top: 1px solid var(--line); margin-top: 0; }
+.np-btn svg { display: block; }
+#btn-back, #btn-fwd { color: var(--text); }
