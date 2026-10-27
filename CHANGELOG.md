@@ -6,7 +6,8 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 
 ## Unreleased
 
-_Nothing yet._
+**Housekeeping**
+- Added a navigation bar spec shared by all dashes.
 
 ## Released
 
