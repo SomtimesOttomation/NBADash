@@ -465,3 +465,18 @@ a.plink:hover { color: var(--accent2); }
 @keyframes np-spin { to { transform: rotate(360deg); } }
 .navpill .psearch input { width: min(483px, 46vw) !important; }
 #btn-refresh, #btn-settings { color: var(--text); }
+
+/* Rookie Watch */
+.rk-podium { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 14px; }
+.rk-card { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; padding: 16px 14px; }
+.rk-card.first { border-color: var(--accent); }
+.rk-place { position: absolute; top: 10px; left: 12px; font-weight: 800; color: var(--muted); }
+.rk-card.first .rk-place { color: var(--accent); }
+.rk-card-name small, .rk-who small { display: block; color: var(--muted); font-size: 12px; }
+.rk-card-line { font-size: 13px; }
+.rk-card-score { display: flex; gap: 8px; align-items: baseline; font-size: 12px; color: var(--muted); }
+.rk-card-score b { font-size: 26px; color: var(--text); }
+.rk-who { display: inline-flex; align-items: center; gap: 10px; }
+.rk-table th.sortable { cursor: pointer; user-select: none; }
+.rk-table th.sorted { color: var(--accent); }
+.rk-table tr.muted td { opacity: .6; }
