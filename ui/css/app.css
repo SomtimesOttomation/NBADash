@@ -423,3 +423,4 @@ a.plink:hover { color: var(--accent2); }
 /* six nav links: tighten earlier, and drop the brand text on narrow windows */
 @media (max-width: 1440px) { #topbar { gap: 10px; } .nav a { padding: 6px 7px; font-size: 13px; } .psearch input { width: 160px; } }
 @media (max-width: 1180px) { .brand-text { display: none; } .psearch input { width: 130px; } .nav { gap: 0; } }
+.back-btn { flex: 0 0 auto; font-size: 16px; }

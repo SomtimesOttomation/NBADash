@@ -7,9 +7,13 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 ## Unreleased
 
 **Feature**
+- Back button (also Alt+Left and the mouse back button).
+- New Fewest Points (Starters) card, first on the Losers tab.
 - New Free Agents page: recently waived players (including ESPN's official transactions list, loaded on request), a watch list with notes, and a notice when a watched player signs.
 
 **Bug/Fix**
+- Weeks now run Monday to Sunday.
+- Losers cards need a fair sample: 10+ minutes per game played, 5+ free throws for Worst FT%, 10+ threes for Worst 3P%.
 - Fixed bug with injury tags not showing on team rosters.
 - Box scores now list inactive players, with their injury status when known.
 - Fixed bug with player pictures not loading until a player was opened.

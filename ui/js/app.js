@@ -103,6 +103,13 @@ $('#btn-theme').addEventListener('click', () => {
   const next = order[(order.indexOf(S.state.settings.theme) + 1) % 3];
   S.saveSettings({ theme: next });
 });
+// Back: the page's own history (every view is a #/ route). Also Alt+Left and the mouse's back button.
+let navDepth = 0;
+window.addEventListener('hashchange', () => { navDepth++; $('#btn-back').disabled = false; });
+const goBack = () => { if (navDepth > 0) { navDepth -= 2; history.back(); } else location.hash = '#/'; };
+$('#btn-back').addEventListener('click', goBack);
+document.addEventListener('keydown', (e) => { if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); goBack(); } });
+window.addEventListener('mouseup', (e) => { if (e.button === 3) { e.preventDefault(); goBack(); } });
 $('#btn-settings').addEventListener('click', openSettings);
 $('#btn-version').addEventListener('click', openUpdate);
 
