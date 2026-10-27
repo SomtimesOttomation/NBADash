@@ -25,10 +25,7 @@
       </nav>
       <div class="topbar-right">
         <button id="btn-version" class="ver-btn" type="button" hidden title="Check for updates"></button>
-        <span id="live-status" class="live-status" title=""></span>
-        <button id="btn-refresh" class="icon-btn" type="button" title="Refresh live scores (F5)" aria-label="Refresh">&#x21bb;</button>
         <button id="btn-theme" class="icon-btn" type="button" title="Theme" aria-label="Theme"></button>
-        <button id="btn-settings" class="icon-btn" type="button" title="Settings" aria-label="Settings">&#x2699;</button>
       </div>
     </header>
     <div id="haltbar" class="haltbar" hidden role="status"></div>
@@ -40,12 +37,16 @@
         <button id="btn-back" class="np-btn" type="button" title="Back (Alt+Left)" aria-label="Back"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         <button id="btn-fwd" class="np-btn" type="button" title="Forward (Alt+Right)" aria-label="Forward"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         <a id="btn-home" class="np-btn" href="#/" title="Home" aria-label="Home" data-route="home"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/></svg></a>
+        <button id="btn-refresh" class="np-btn" type="button" title="Refresh live scores (F5)" aria-label="Refresh"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         <span class="np-sep" aria-hidden="true"></span>
         <div class="psearch">
           <div id="psearch-ghost" class="psearch-ghost" aria-hidden="true"></div>
           <input id="psearch" type="search" placeholder="Search Players..." autocomplete="off" spellcheck="false" aria-label="Search players">
           <div id="psearch-results" class="psearch-results" hidden></div>
         </div>
+        <span class="np-sep" aria-hidden="true"></span>
+        <span id="live-status" class="live-status np-live" title=""></span>
+        <button id="btn-settings" class="np-btn" type="button" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4zM19.4 13.5l1.6 1.2-1.8 3.1-1.9-.7a7.6 7.6 0 0 1-1.7 1l-.3 2h-3.6l-.3-2a7.6 7.6 0 0 1-1.7-1l-1.9.7-1.8-3.1 1.6-1.2a7.7 7.7 0 0 1 0-2l-1.6-1.2 1.8-3.1 1.9.7a7.6 7.6 0 0 1 1.7-1l.3-2h3.6l.3 2a7.6 7.6 0 0 1 1.7 1l1.9-.7 1.8 3.1-1.6 1.2a7.7 7.7 0 0 1 0 2z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       </div>
     </div>
     </div>
