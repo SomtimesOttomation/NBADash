@@ -6,10 +6,14 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 
 ## Unreleased
 
-**Redesign**
-- Refresh, live status and Settings moved into the navigation bar.
+_Nothing yet._
 
 ## Released
+
+### v0.13.1
+
+**Redesign**
+- Refresh, live status and Settings moved into the navigation bar.
 
 ### v0.13.0
 
