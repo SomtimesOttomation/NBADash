@@ -12,3 +12,6 @@ tools/probe-player-output/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# test screenshots never belong in the repo
+/*.png

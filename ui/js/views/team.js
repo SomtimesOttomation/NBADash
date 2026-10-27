@@ -7,8 +7,11 @@ import { teamRows, reportCard } from '../teamstats.js';
 import { gradesUnlocked } from './rankings.js';
 import { txTable } from './transactions.js';
 import { calc } from '../formulas.js';
+import { remainingSchedule, ordinal } from '../sos.js';
 
 let tab = 'roster';
+let sosShown = '';         // team whose schedule square has been clicked open
+let sosMemo = { key: '', res: null };
 let gradeShown = '';      // team whose grade square has been clicked open
 let gradeMemo = { rev: -1, method: '', rep: null };
 
@@ -50,7 +53,7 @@ function draw({ el, arg }) {
       h('dl', { class: 'kv', style: { marginTop: '8px' } },
         h('dt', null, 'Arena'), h('dd', null, arenaOf(arg, file)),
         h('dt', null, 'Head coach'), h('dd', null, file?.headCoach || '—'))),
-    gradeBox(arg, () => draw({ el, arg })));
+    h('div', { class: 'hero-boxes' }, sosBox(arg, () => draw({ el, arg })), gradeBox(arg, () => draw({ el, arg }))));
 
   const tabs = h('div', { class: 'tabs' }, [['roster', 'Roster'], ['leaders', 'Leaders'], ['schedule', 'Schedule'], ['results', 'Box scores'], ['tx', 'Transactions']].map(([k, label]) =>
     h('button', { class: tab === k ? 'active' : '', type: 'button', onclick: () => { tab = k; draw({ el, arg }); } }, label)));
@@ -77,6 +80,40 @@ function teamGrade(abbr) {
   const method = S.state.settings.ratingMethod || 'native';
   if (gradeMemo.rev !== L.rev || gradeMemo.method !== method || !gradeMemo.rep) gradeMemo = { rev: L.rev, method, rep: reportCard(teamRows(L.data, method)) };
   return gradeMemo.rep.find((r) => r.abbr === abbr) || null;
+}
+
+// Remaining strength of schedule: needs every team's saved schedule (for ranks) and the league's SRS.
+function teamSos(abbr) {
+  const L = S.state.league;
+  if (!L.data) return null;
+  const files = new Map(S.state.teams.map((t) => [t.abbr, S.state.teamFiles.get(t.abbr)]));
+  const loaded = [...files.values()].filter(Boolean).length;
+  const method = S.state.settings.ratingMethod || 'native';
+  const key = `${L.rev}|${loaded}|${method}`;
+  if (sosMemo.key !== key) sosMemo = { key, res: remainingSchedule(files, teamRows(L.data, method)) };
+  return { ...sosMemo.res, me: sosMemo.res.teams.get(abbr), all: loaded >= S.state.teams.length };
+}
+
+function sosBox(abbr, redraw) {
+  const open = sosShown === abbr;
+  const toggle = () => {
+    sosShown = open ? '' : abbr;
+    if (!open) { S.loadLeague(); S.state.teams.forEach((t) => S.loadTeamFile(t.abbr)); }      // all schedules, for the ranking
+    redraw();
+  };
+  const attrs = { ...calc('sos'), class: `grade-box ${open ? 'open' : ''}`, type: 'button', onclick: toggle };
+  if (!open) return h('button', attrs, h('span', { class: 'gb-q' }, '?'), h('small', null, 'Strength of Schedule'));
+  const r = teamSos(abbr);
+  if (!r || !r.me || !r.all) return h('button', attrs, h('span', { class: 'gb-q' }, '\u2013'), h('small', null, 'Loading\u2026'));
+  const m = r.me;
+  if (!m.left) return h('button', attrs, h('span', { class: 'gb-q' }, '\u2013'), h('small', null, 'No games left'));
+  const tone = m.allRank <= 10 ? 'hard' : m.allRank > m.of - 10 ? 'easy' : 'mid';
+  return h('button', attrs,
+    h('span', { class: `sos-val sos-${tone}` }, `${m.all > 0 ? '+' : ''}${m.all.toFixed(1)}`),
+    h('small', null, `${ordinal(m.allRank)} hardest of ${m.of}`),
+    h('span', { class: 'gb-parts' }, `Next ${Math.min(10, m.left)}: ${ordinal(m.nextRank)}`),
+    h('small', { class: 'gb-sub' }, `${m.left} left \u00b7 ${m.b2b} B2B`),
+    r.early ? h('small', { class: 'gb-early' }, 'Early season') : null);
 }
 
 function gradeBox(abbr, redraw) {

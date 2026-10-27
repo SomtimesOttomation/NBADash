@@ -452,3 +452,10 @@ a.plink:hover { color: var(--accent2); }
 #btn-back, #btn-fwd { color: var(--text); }
 #btn-home { color: var(--text); }
 #btn-home.active { color: var(--accent); }
+
+/* remaining strength of schedule square */
+.hero-boxes { margin-left: auto; display: flex; gap: 12px; flex: 0 0 auto; }
+.hero-boxes .grade-box { margin-left: 0; }
+.sos-val { font-size: 28px; font-weight: 800; line-height: 1.1; }
+.sos-hard { color: #cc3b3b; } .sos-mid { color: #b7892b; } .sos-easy { color: #1f9d55; }
+.grade-box .gb-sub { font-size: 10.5px; }
