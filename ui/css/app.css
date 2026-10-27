@@ -439,3 +439,7 @@ a.plink:hover { color: var(--accent2); }
 .navpill .psearch-results { left: 50%; transform: translateX(-50%); }
 .pow { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; margin-bottom: 4px; }
 .pow-note { margin: 6px 0 14px; font-size: 12.5px; }
+/* square-edged variant of the navigation bar */
+.navpill { border-radius: 0; }
+.np-btn { border-radius: 4px; }
+.navpill .psearch input { border-radius: 4px; }
