@@ -6,6 +6,12 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 
 ## Unreleased
 
+_Nothing yet._
+
+## Released
+
+### v0.13.0
+
 **Feature**
 - Team pages get a Strength of Schedule square: how hard the remaining games are, ranked against the league.
 - Week pages show the best and worst 3 players of the week (worst counts rotation players only).
@@ -21,8 +27,6 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 
 **Redesign**
 - New navigation bar under the week bar: back, forward, home and a wider player search.
-
-## Released
 
 ### v0.12.0
 
