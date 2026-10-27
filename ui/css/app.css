@@ -450,3 +450,5 @@ a.plink:hover { color: var(--accent2); }
 .navpill { border-top: 1px solid var(--line); margin-top: 0; }
 .np-btn svg { display: block; }
 #btn-back, #btn-fwd { color: var(--text); }
+#btn-home { color: var(--text); }
+#btn-home.active { color: var(--accent); }
