@@ -7,12 +7,19 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 ## Unreleased
 
 **Feature**
+- Week pages show the best and worst 3 players of the week (worst counts rotation players only).
+- New Fewest Points (Starters) card, first on the Losers tab.
 - New Free Agents page: recently waived players (including ESPN's official transactions list, loaded on request), a watch list with notes, and a notice when a watched player signs.
 
 **Bug/Fix**
+- Weeks now run Monday to Sunday.
+- Losers cards need a fair sample: 10+ minutes per game played, 5+ free throws for Worst FT%, 10+ threes for Worst 3P%.
 - Fixed bug with injury tags not showing on team rosters.
 - Box scores now list inactive players, with their injury status when known.
 - Fixed bug with player pictures not loading until a player was opened.
+
+**Redesign**
+- New navigation bar under the week bar: back, forward, home and a wider player search.
 
 ## Released
 
