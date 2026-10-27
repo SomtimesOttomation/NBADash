@@ -50,8 +50,10 @@ export const state = {
 // ---- season weeks: ESPN's "Week 1" is Oct 20-26, 2026 (opening night is a Tuesday); each week runs 7 days from there
 export const SEASON_START = '20261020';
 const keyToUtc = (k) => Date.UTC(+k.slice(0, 4), +k.slice(4, 6) - 1, +k.slice(6, 8));
-export const weekOfKey = (k) => Math.floor((keyToUtc(k) - keyToUtc(SEASON_START)) / 86400000 / 7) + 1;
-export const weekDayKeys = (n) => Array.from({ length: 7 }, (_, i) => addDaysKey(SEASON_START, (n - 1) * 7 + i));
+// Weeks run Monday to Sunday; Week 1 is the Monday-Sunday week the season opens in.
+export const WEEK_START = '20261019';
+export const weekOfKey = (k) => Math.floor((keyToUtc(k) - keyToUtc(WEEK_START)) / 86400000 / 7) + 1;
+export const weekDayKeys = (n) => Array.from({ length: 7 }, (_, i) => addDaysKey(WEEK_START, (n - 1) * 7 + i));
 export const weekRangeLabel = (n) => { const d = weekDayKeys(n); const f = (k) => fmtKey(k, { weekday: undefined }); return `${f(d[0])} - ${f(d[6])}`; };
 // weeks that have at least one saved day, ascending; the link only appears once there is data
 export const weeksWithData = () => [...new Set(state.cachedDayKeys.filter((k) => k >= SEASON_START).map(weekOfKey))].sort((a, b) => a - b);

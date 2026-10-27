@@ -132,13 +132,15 @@ const pct = (m, a) => (a > 0 ? (100 * m) / a : NaN);
 
 // minGames-scaled qualification keeps tiny samples out early in the season
 export const LEADER_DEFS = [
+  { key: 'ptsStarters', loser: 'Fewest Points (Starters)', loserOnly: true, title: 'Points (Starters)', unit: 'PPG', v: (p) => per(p, 'pts'), f: 1,
+    ok: (p) => p.gs * 2 >= p.gp, sub: (p) => `${p.gs} GS \u00b7 ${p.gp} GP` },
   { key: 'pts', loser: 'Fewest Points', title: 'Points', unit: 'PPG', v: (p) => per(p, 'pts'), f: 1 },
   { key: 'reb', title: 'Rebounds', unit: 'RPG', v: (p) => per(p, 'reb'), f: 1 },
   { key: 'ast', title: 'Assists', unit: 'APG', v: (p) => per(p, 'ast'), f: 1 },
   { key: 'tpm', title: '3-Pointers Made', unit: '3PM/G', v: (p) => per(p, 'tpm'), f: 1 },
   { key: 'fgp', loser: 'Worst Field Goal %', title: 'Field Goal %', unit: 'FG%', v: (p) => pct(p.tot.fgm, p.tot.fga), f: 1, suffix: '%', ok: (p, a) => p.tot.fga >= 3 * a.games, sub: (p) => `${p.tot.fgm}/${p.tot.fga} FG` },
-  { key: 'tpp', loser: 'Worst 3-Point %', title: '3-Point %', unit: '3P%', v: (p) => pct(p.tot.tpm, p.tot.tpa), f: 1, suffix: '%', ok: (p, a) => p.tot.tpa >= 1 * a.games, sub: (p) => `${p.tot.tpm}/${p.tot.tpa} 3PT` },
-  { key: 'ftp', loser: 'Worst Free Throw %', title: 'Free Throw %', unit: 'FT%', v: (p) => pct(p.tot.ftm, p.tot.fta), f: 1, suffix: '%', ok: (p, a) => p.tot.fta >= 1 * a.games, sub: (p) => `${p.tot.ftm}/${p.tot.fta} FT` },
+  { key: 'tpp', loser: 'Worst 3-Point %', title: '3-Point %', unit: '3P%', v: (p) => pct(p.tot.tpm, p.tot.tpa), f: 1, suffix: '%', ok: (p, a) => p.tot.tpa >= 1 * a.games, okWorst: (p) => p.tot.tpa >= 10, sub: (p) => `${p.tot.tpm}/${p.tot.tpa} 3PT` },
+  { key: 'ftp', loser: 'Worst Free Throw %', title: 'Free Throw %', unit: 'FT%', v: (p) => pct(p.tot.ftm, p.tot.fta), f: 1, suffix: '%', ok: (p, a) => p.tot.fta >= 1 * a.games, okWorst: (p) => p.tot.fta >= 5, sub: (p) => `${p.tot.ftm}/${p.tot.fta} FT` },
   { key: 'stl', title: 'Steals', unit: 'SPG', v: (p) => per(p, 'stl'), f: 1 },
   { key: 'blk', title: 'Blocks', unit: 'BPG', v: (p) => per(p, 'blk'), f: 1 },
   { key: 'stocks', title: 'Stocks (Steals + Blocks)', unit: 'per game', v: (p) => (p.tot.stl + p.tot.blk) / p.gp, f: 1 },
@@ -158,7 +160,7 @@ export const LEADER_DEFS = [
 ];
 
 // Ranks players for every category. ctxFor(p) gives that player's team context {games, T, O}.
-// minMpg: minutes per team game needed to appear at all; minGpShare: share of team games the player must have played.
+// minMpg: minutes per game played needed to appear at all; minGpShare: share of team games the player must have played.
 // worst: the Losers view. Same qualification, reversed order, and only the categories where a low number means a player is bad at the game.
 // Small edge for a bigger sample: each value is pulled toward the pool average as if half an average game were added,
 // so a player with more games ranks ahead of one with fewer games and a near-identical number. The value shown is unchanged.
@@ -174,7 +176,7 @@ export function rankAll(players, ctxFor, top, { minMpg = 8, minGpShare = 0, wors
     const rows = players
       .filter((p) => {
         const c = ctxFor(p);
-        return c && c.games > 0 && p.gp > 0 && p.gp >= Math.ceil(minGpShare * c.games) && p.tot.min / c.games >= minMpg && (!d.ok || d.ok(p, c));
+        return c && c.games > 0 && p.gp > 0 && p.gp >= Math.ceil(minGpShare * c.games) && p.tot.min / p.gp >= minMpg && (!d.ok || d.ok(p, c)) && (!worst || !d.okWorst || d.okWorst(p));
       })
       .map((p) => ({ p, value: d.v(p, ctxFor(p)) }))
       .filter((r) => Number.isFinite(r.value));
