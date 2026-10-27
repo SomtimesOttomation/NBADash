@@ -36,7 +36,7 @@ function route() {
   const map = { '': home, team: teamV, game: gameV, standings, leaders: leadersV, rankings: rankingsV, transactions: txV, freeagents: faV, player: playerV, compare: compareV, week: weekV };
   const mod = map[name] || home;
   const routeName = map[name] ? (name || 'home') : 'home';
-  document.querySelectorAll('#nav a').forEach((a) => a.classList.toggle('active', a.dataset.route === routeName));
+  document.querySelectorAll('#nav a, #btn-home').forEach((a) => a.classList.toggle('active', a.dataset.route === routeName));
   current?.cleanup?.();
   view.replaceChildren();
   const ctx = { el: view, arg: arg ? decodeURIComponent(arg) : '' };
@@ -105,8 +105,11 @@ $('#btn-theme').addEventListener('click', () => {
 });
 // Back: the page's own history (every view is a #/ route). Also Alt+Left and the mouse's back button.
 let navDepth = 0;
-window.addEventListener('hashchange', () => { navDepth++; $('#btn-back').disabled = false; });
+window.addEventListener('hashchange', () => { navDepth++; });
 const goBack = () => { if (navDepth > 0) { navDepth -= 2; history.back(); } else location.hash = '#/'; };
+$('#btn-fwd').addEventListener('click', () => history.forward());
+document.addEventListener('keydown', (e) => { if (e.altKey && e.key === 'ArrowRight') { e.preventDefault(); history.forward(); } });
+window.addEventListener('mouseup', (e) => { if (e.button === 4) { e.preventDefault(); history.forward(); } });
 $('#btn-back').addEventListener('click', goBack);
 document.addEventListener('keydown', (e) => { if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); goBack(); } });
 window.addEventListener('mouseup', (e) => { if (e.button === 3) { e.preventDefault(); goBack(); } });
