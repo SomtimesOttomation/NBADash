@@ -480,3 +480,16 @@ a.plink:hover { color: var(--accent2); }
 .rk-table th.sortable { cursor: pointer; user-select: none; }
 .rk-table th.sorted { color: var(--accent); }
 .rk-table tr.muted td { opacity: .6; }
+
+/* live status: a button that pauses all data traffic; a strong blink while a game is live */
+.np-live { border: 0; background: transparent; font: inherit; font-size: 13px; cursor: pointer; border-radius: 4px; }
+.np-live:hover { background: var(--surface2); color: var(--text); }
+.live-status.on { color: var(--live); font-weight: 700; }
+.live-status.on::before { width: 10px; height: 10px; animation: live-blink 0.9s ease-in-out infinite; }
+@keyframes live-blink {
+  0%, 100% { opacity: 1; transform: scale(1.1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 70%, transparent), 0 0 8px var(--live); }
+  50% { opacity: .15; transform: scale(.7); box-shadow: 0 0 0 7px transparent, 0 0 0 transparent; }
+}
+.live-status.halted { color: var(--warn); font-weight: 700; }
+.live-status.halted::before { content: ""; width: 8px; height: 8px; border-radius: 1px; background: var(--warn); box-shadow: 3px 0 0 -0px var(--surface), 5px 0 0 var(--warn); width: 3px; margin-right: 4px; }
+@media (prefers-reduced-motion: reduce) { .live-status.on::before { animation-duration: 2.4s; } }

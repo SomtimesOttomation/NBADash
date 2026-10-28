@@ -338,7 +338,12 @@ export function applyTheme() {
   notify('theme');
 }
 
-// After the launcher's kill switch only the person resumes, from inside the dash.
+// The live status button: same as the launcher's kill switch, started from inside the dash.
+export async function stopTraffic() {
+  await bridge.request('traffic.stop');
+  state.halted = true; notify('traffic');
+}
+// After the kill switch only the person resumes, from inside the dash.
 export async function resumeTraffic() {
   await bridge.request('traffic.resume');
   state.halted = false; notify('traffic');

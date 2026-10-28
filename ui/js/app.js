@@ -85,10 +85,13 @@ function liveStatus() {
   const el = $('#live-status');
   const l = S.state.live;
   const anyLive = S.allEvents().some((e) => e.state === 'in');
-  el.className = `live-status ${anyLive ? 'on' : ''} ${l.error ? 'err' : ''}`;
+  const halted = !!S.state.halted;
+  el.className = `live-status np-live ${anyLive && !halted ? 'on' : ''} ${l.error && !halted ? 'err' : ''} ${halted ? 'halted' : ''}`;
+  el.setAttribute('aria-pressed', halted ? 'true' : 'false');
   const manual = !S.state.settings.autoRefresh;
   el.textContent = l.error ? 'Offline' : manual ? (l.at ? `Manual \u00b7 updated ${ago(l.at)}` : 'Manual refresh') : anyLive ? 'Live' : (l.at ? `Updated ${ago(l.at)}` : '');
-  el.title = l.error || '';
+  if (halted) el.textContent = 'Paused';
+  el.title = halted ? 'All data traffic is paused. Click to resume.' : `${l.error ? `${l.error}\n` : ''}Click to pause all data traffic`;
 }
 
 // secret: five clicks on the brand within 3 seconds opens the traffic panel; otherwise it goes home
@@ -115,6 +118,8 @@ $('#btn-back').addEventListener('click', goBack);
 document.addEventListener('keydown', (e) => { if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); goBack(); } });
 window.addEventListener('mouseup', (e) => { if (e.button === 3) { e.preventDefault(); goBack(); } });
 $('#btn-settings').addEventListener('click', openSettings);
+// Live status doubles as a pause switch: one click stops every data request (sync, live scores, box scores) until clicked again.
+$('#live-status').addEventListener('click', () => (S.state.halted ? S.resumeTraffic() : S.stopTraffic()).catch((e) => toast(e.message)));
 $('#btn-version').addEventListener('click', openUpdate);
 
 // Kill switch (DashLauncher): a bar until the person resumes.
@@ -142,7 +147,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'F5') { e.preventDef
 
 S.subscribe((topics) => {
   if (topics.has('theme') || topics.has('settings')) themeIcon();
-  if (topics.has('traffic')) haltBar();
+  if (topics.has('traffic')) { haltBar(); liveStatus(); }
   if (topics.has('settings')) liveStatus();
   if (topics.has('teams') || topics.has('favorites')) renderBanner($('#banner'), location.hash.startsWith('#/team/') ? decodeURIComponent(location.hash.slice(7)) : '');
   if (topics.has('days')) renderWeekBar($('#weekbar'), location.hash.startsWith('#/week/') ? +location.hash.slice(7) : 0);
