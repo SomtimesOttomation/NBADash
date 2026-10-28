@@ -6,6 +6,12 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 
 ## Unreleased
 
+_Nothing yet._
+
+## Released
+
+### v0.14.0
+
 **Feature**
 - Rookie Watch tab: this season's rookies ranked by a Rookie score.
 
@@ -14,8 +20,6 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 
 **Housekeeping**
 - Added a navigation bar spec shared by all dashes.
-
-## Released
 
 ### v0.13.1
 
