@@ -6,7 +6,8 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 
 ## Unreleased
 
-_Nothing yet._
+**Housekeeping**
+- Navigation bar spec updated for the live status pause switch.
 
 ## Released
 
