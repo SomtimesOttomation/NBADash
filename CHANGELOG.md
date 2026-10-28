@@ -10,6 +10,11 @@ _Nothing yet._
 
 ## Released
 
+### v0.15.0
+
+**Feature**
+- Live status blinks more strongly during live games, and clicking it pauses all data traffic until clicked again.
+
 ### v0.14.0
 
 **Feature**
