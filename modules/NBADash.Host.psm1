@@ -403,6 +403,11 @@ function Invoke-PageCommand {
             }
             Reply $Msg.id (ConvertTo-Json -InputObject $obj -Depth 5 -Compress)
         }
+        'traffic.stop' {
+            # the live status button in the navigation bar: same as the launcher's kill switch
+            Stop-DashTraffic
+            Reply $Msg.id 'true'
+        }
         'traffic.resume' {
             # only the person resumes after the kill switch, from inside the dash
             $script:Halted = $false

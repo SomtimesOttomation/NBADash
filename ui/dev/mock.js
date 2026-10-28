@@ -155,6 +155,7 @@ export async function request(cmd, args) {
       setTimeout(() => { espnTxFile = { fetchedAt: new Date().toISOString(), complete: true, entries }; emit('txhistory', { running: false, ok: true, count: entries.length }); }, 400);
       return true;
     }
+    case 'traffic.stop': setTimeout(() => emit && emit('traffic', { stopped: true }), 10); return true;
     case 'traffic.resume': setTimeout(() => emit && emit('traffic', { stopped: false }), 10); return true;
     case 'cache.read': {
       const p = args.path; let m;
