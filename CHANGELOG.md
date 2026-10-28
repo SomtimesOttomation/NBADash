@@ -6,6 +6,12 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 
 ## Unreleased
 
+**Feature**
+- Rookie Watch tab: this season's rookies ranked by a Rookie score.
+
+**Redesign**
+- Leaderboards use the NBA's official minimums (70% of games; made shots for percentages).
+
 **Housekeeping**
 - Added a navigation bar spec shared by all dashes.
 
