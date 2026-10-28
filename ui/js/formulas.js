@@ -57,6 +57,7 @@ const DEFS = {
     formula: 'Overall = 30% SRS + 35% Offense + 35% Defense\nOffense = 20% ORtg + 32% eFG% + 20% TOV% + 16% ORB% + 12% FT rate\nDefense = same five, for what opponents did',
     why: 'Each input is turned into a percentile against the other teams, then weighted. SRS is the point differential adjusted for strength of schedule, so a team isn\u2019t marked down for facing good opponents. The weights follow Dean Oliver’s Four Factors (shooting matters most). Grades are a curve: roughly the top 10% get an A. Teams with more games get a small edge.', note: methodLine(),
   }),
+  nbamin: () => ({ title: 'NBA statistical minimums', formula: 'Per-game cards: played 70% of team games\nFG%, eFG%: 300 FG made per 82 team games  (≈ 3.7 a game)\nFT%: 125 FT made per 82  (≈ 1.5 a game)\n3P%: 82 threes made per 82  (1 a game)\nShooting Splits: all three\nScaled to team games so far, rounded up', why: 'The NBA’s own rule for league leaders (NBA.com statistical minimums). Shooting cards count makes, not attempts, so nobody leads on a handful of shots. Losers keep looser rules (10+ minutes, half the games, attempt minimums) so poor shooters still show up.' }),
   gpedge: () => ({ title: 'Games-played edge', formula: 'Ranked value = (GP × value + 0.5 × league average) / (GP + 0.5)', why: 'Pulls each number slightly toward the average, as if half an average game were added. Breaks near-ties in favor of bigger samples; fades as the season goes on. The number shown is unchanged.' }),
 };
 
