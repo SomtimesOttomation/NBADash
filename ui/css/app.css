@@ -493,3 +493,23 @@ a.plink:hover { color: var(--accent2); }
 .live-status.halted { color: var(--warn); font-weight: 700; }
 .live-status.halted::before { content: ""; width: 8px; height: 8px; border-radius: 1px; background: var(--warn); box-shadow: 3px 0 0 -0px var(--surface), 5px 0 0 var(--warn); width: 3px; margin-right: 4px; }
 @media (prefers-reduced-motion: reduce) { .live-status.on::before { animation-duration: 2.4s; } }
+
+/* East-West Report (standings) */
+.ewr { margin-top: 26px; }
+.ewr-main { padding: 16px 18px; }
+.ewr-headline { margin: 0 0 10px; font-size: 18px; font-weight: 700; }
+.ewr-bar { display: flex; height: 30px; border-radius: 4px; overflow: hidden; font-size: 12.5px; font-weight: 700; color: #fff; }
+.ewr-e { background: #1d5fbf; display: flex; align-items: center; padding-left: 10px; min-width: 70px; }
+.ewr-w { flex: 1; background: #b8282e; display: flex; align-items: center; justify-content: flex-end; padding-right: 10px; min-width: 70px; }
+.ewr-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 14px; }
+.ewr-tile { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; }
+.ewr-tile b { font-size: 20px; }
+.ewr-seeds { margin-top: 14px; padding: 8px 16px; }
+.ewr-seed-head, .ewr-seed { display: grid; grid-template-columns: 1fr 96px 1fr; align-items: center; gap: 8px; }
+.ewr-seed-head { font-weight: 700; padding: 6px 0; } .ewr-seed-head > :nth-child(2) { text-align: center; } .ewr-seed-head > :last-child { text-align: right; }
+.ewr-seed { border-top: 1px solid var(--line); padding: 6px 0; }
+.ewr-rank { text-align: center; color: var(--muted); font-weight: 700; }
+.ewr-team { display: inline-flex; align-items: center; gap: 8px; padding: 2px 6px; border-radius: 4px; }
+.ewr-seed > .ewr-team:last-child { justify-self: end; flex-direction: row-reverse; }
+.ewr-team.better { background: var(--surface2); box-shadow: inset 3px 0 0 var(--accent); }
+.ewr-seed > .ewr-team:last-child.better { box-shadow: inset -3px 0 0 var(--accent); }

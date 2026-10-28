@@ -196,7 +196,7 @@ export function rankAll(players, ctxFor, top, { minMpg = 8, minGpShare = 0, wors
 export function leaders(agg, top = 3) { return rankAll(agg.players, () => agg, top); }
 
 // ---------------------------------------------------------------- league-wide, built one saved box score at a time
-export const LEAGUE_VERSION = 5;   // 5: per-game log per player (Form rating)
+export const LEAGUE_VERSION = 6;   // 6: results by opponent (East-West Report); 5: per-game log per player (Form rating)
 export const LEAGUE_VERSION_PREV = 4;   // 4: rebuild once to add counted possessions (Native ratings) and opponents faced (SRS)
 
 // ---------------------------------------------------------------- possessions (team ratings formula setting)
@@ -231,6 +231,10 @@ export function leagueAdd(lg, box) {
     te.games++;
     te.opp[theirs.team] = (te.opp[theirs.team] || 0) + 1;      // opponents faced, for strength of schedule
     const gT = teamTotals(mine), gO = teamTotals(theirs);
+    // results by opponent [wins, losses, points for, points against], for the East-West Report
+    const vs = (te.vs || (te.vs = {}))[theirs.team] || (te.vs[theirs.team] = [0, 0, 0, 0]);
+    if (gT.pts !== gO.pts) vs[gT.pts > gO.pts ? 0 : 1]++;
+    vs[2] += gT.pts; vs[3] += gO.pts;
     addTot(te.T, gT); addTot(te.O, gO);
     // Native: possessions counted from the play-by-play when the saved box score has them, else this game's estimate
     const cp = box.poss || {};
