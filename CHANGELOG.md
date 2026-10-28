@@ -6,10 +6,17 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 
 ## Unreleased
 
-**Housekeeping**
-- Navigation bar spec updated for the live status pause switch.
+_Nothing yet._
 
 ## Released
+
+### v0.16.0
+
+**Feature**
+- East-West Report on the Standings page: head-to-head record, margin, average SRS, top-10 count and seed-by-seed comparison.
+
+**Housekeeping**
+- Navigation bar spec updated for the live status pause switch.
 
 ### v0.15.0
 
