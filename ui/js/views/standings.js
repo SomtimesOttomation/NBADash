@@ -2,9 +2,10 @@ import * as S from '../store.js';
 import { h, ago } from '../util.js';
 import { displayCode } from '../arenas.js';
 import { teamLogo, sectionHead, emptyState } from '../components.js';
+import { eastWestReport } from './eastwest.js';
 
-export function mount(ctx) { S.loadStandings().then(() => draw(ctx)); draw(ctx); }
-export function update(topics, ctx) { if (topics.has('standings') || topics.has('favorites')) draw(ctx); }
+export function mount(ctx) { S.loadStandings().then(() => draw(ctx)); S.loadLeague().then(() => draw(ctx)); draw(ctx); }
+export function update(topics, ctx) { if (topics.has('standings') || topics.has('favorites') || topics.has('league') || topics.has('settings')) draw(ctx); }
 
 const COLS = [['W', 'wins'], ['L', 'losses'], ['PCT', 'winPercent'], ['GB', 'gamesBehind'], ['HOME', 'Home'], ['AWAY', 'Road'], ['L10', 'Last Ten Games'], ['STRK', 'streak']];
 const pick = (stats, key) => {
@@ -35,6 +36,6 @@ function draw({ el }) {
           h('td', null, h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: '8px' } }, h('small', null, i + 1), teamLogo(t.abbr, 24), h('b', null, displayCode(t.abbr)))),
           COLS.map(([, k]) => h('td', null, pick(t.stats, k))))))))));
   }
-  out.push(wrap);
+  out.push(wrap, eastWestReport());
   el.replaceChildren(...out);
 }
