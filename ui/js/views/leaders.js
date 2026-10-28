@@ -42,7 +42,7 @@ function draw({ el }) {
     if (memo.rev !== L.rev || memo.tab !== tab || memo.form !== form || !memo.cards) memo = { rev: L.rev, tab, form, cards: (tab === 'losers' ? leagueLosers : leagueLeaders)(lg, 5, { form }) };
     const note = h('p', { class: 'muted', style: { margin: '0 0 12px' } },
       tab === 'losers' ? 'The five worst per category, the mirror image of Leaders. ' : 'Top 5 per category. ',
-      'Players with more games get a ', h('span', calc('gpedge'), 'small edge'), ' in close races. Players need 10+ minutes a game and at least half of their team\u2019s games. Hover a category name for its formula.',
+      'Players with more games get a ', h('span', calc('gpedge'), 'small edge'), ' in close races.', tab === 'losers' ? ' Players need 10+ minutes a game and at least half of their team\u2019s games. Hover a category name for its formula.' : [' Players need 70% of their team\u2019s games; shooting percentages use the NBA\u2019s ', h('span', calc('nbamin'), 'made-shot minimums'), ' instead. Hover a category name for its formula.'],
       L.loading ? ` Updating\u2026 ${L.n} of ${L.total} new box scores.` : '');
     body = h('div', null, note, mode === 'cards' ? leaderCardGrid(memo.cards, { showTeam: true }) : leaderRowSections(memo.cards, { worst: tab === 'losers' }));
   }
