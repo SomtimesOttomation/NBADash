@@ -4,7 +4,7 @@ import * as S from '../store.js';
 import { h, fmtKey } from '../util.js';
 import { emptyState, teamLogo, avatar, headshotUrl, playerLink } from '../components.js';
 import { displayCode } from '../arenas.js';
-import { applyForm } from '../stats.js';
+import { applyForm, leagueCtx, winShares } from '../stats.js';
 import { calc } from '../formulas.js';
 
 const SORT_KEY = 'nbadash.faSort', VIEW_KEY = 'nbadash.faView';
@@ -42,6 +42,7 @@ function buildRows() {
   const lg = S.state.league.data;
   const form = S.state.settings.showForm !== false;
   if (lg && form) applyForm(lg);
+  const L = lg ? leagueCtx(lg) : null;
   // name -> id, from everything that carries both (ESPN's notes have names only)
   const idByName = new Map();
   const learn = (id, name) => { if (id && name && !idByName.has(S.fold(name))) idByName.set(S.fold(name), String(id)); };
@@ -69,6 +70,7 @@ function buildRows() {
     const lines = lg && id ? Object.values(lg.players).filter((p) => String(p.id) === id) : [];
     const gp = lines.reduce((a, p) => a + p.gp, 0);
     const tot = (x) => lines.reduce((a, p) => a + p.tot[x], 0);
+    const ws = lines.reduce((a, p) => { const tm = lg.teams[p.team]; const w = tm ? winShares(p.tot, tm.T, tm.O, tm.games, L) : null; return w ? a + w.ws : a; }, 0);
     const best = lines.filter((p) => Number.isFinite(p.form)).sort((a, b) => b.gp - a.gp)[0];
     const waivedKey = released ? released.date : '';
     rows.push({
@@ -76,11 +78,11 @@ function buildRows() {
       pos: (released && released.pos) || (lines[0] && lines[0].pos) || '',
       lastTeam: (released && released.team) || (w && w.lastTeam) || (lines[0] && lines[0].team) || '',
       waived: waivedKey, src: released ? released.src : '', unsigned: onTeam ? null : daysSince(waivedKey || (w && w.added) || ''),
-      gp, mpg: gp ? tot('min') / gp : NaN, ppg: gp ? tot('pts') / gp : NaN, form: best ? best.form : NaN,
+      gp, mpg: gp ? tot('min') / gp : NaN, ppg: gp ? tot('pts') / gp : NaN, ws: gp ? ws : NaN, form: best ? best.form : NaN,
       team: onTeam || '', watched: !!w, note: (w && w.note) || '', signedAt: (w && w.signedAt) || '',
     });
   }
-  const useful = (r) => (Number.isFinite(r.form) ? r.form * 2 : 0) + (Number.isFinite(r.mpg) ? r.mpg / 4 : 0) + (Number.isFinite(r.ppg) ? r.ppg / 2 : 0);
+  const useful = (r) => (Number.isFinite(r.ws) ? r.ws * 4 : 0) + (Number.isFinite(r.form) ? r.form * 2 : 0) + (Number.isFinite(r.mpg) ? r.mpg / 4 : 0) + (Number.isFinite(r.ppg) ? r.ppg / 2 : 0);
   rows.sort((a, b) => (sort === 'useful' ? useful(b) - useful(a) : String(b.waived || '').localeCompare(String(a.waived || ''))) || a.name.localeCompare(b.name));
   return rows;
 }
@@ -121,9 +123,9 @@ function draw({ el }) {
       view === 'watch' ? 'Open a player page and press ☆ Watch as free agent.' : 'Waivers show up here as syncs pick them up. Players cut before tracking began can be added from their player page.'));
     return;
   }
-  const cols = ['', 'Player', 'Last team', 'Waived', 'Unsigned', 'GP', 'MPG', 'PPG', ...(form ? ['Form'] : []), 'Status', 'Note'];
+  const cols = ['', 'Player', 'Last team', 'Waived', 'Unsigned', 'GP', 'MPG', 'PPG', 'WS', ...(form ? ['Form'] : []), 'Status', 'Note'];
   const table = h('div', { class: 'card scroll-x' }, h('table', { class: 'tbl fa' },
-    h('thead', null, h('tr', null, cols.map((c) => h('th', null, c === 'Form' ? h('span', calc('form', 'player'), c) : c)))),
+    h('thead', null, h('tr', null, cols.map((c) => h('th', null, c === 'Form' ? h('span', calc('form', 'player'), c) : c === 'WS' ? h('span', calc('ws', 'player'), c) : c)))),
     h('tbody', null, rows.map((r) => h('tr', { class: r.team ? 'fa-signed' : '' },
       h('td', null, h('button', { class: `icon-btn fa-star ${r.watched ? 'on' : ''}`, type: 'button', disabled: r.id ? null : true,
         title: !r.id ? 'Search for this player and use Watch on his page (ESPN\u2019s note has no player id)' : r.watched ? 'Stop watching' : 'Watch this player',
@@ -132,7 +134,7 @@ function draw({ el }) {
       h('td', null, r.lastTeam ? h('span', { class: 'tx-team' }, teamLogo(r.lastTeam, 18), displayCode(r.lastTeam)) : '–'),
       h('td', null, r.waived ? [fmtKey(r.waived), r.src === 'espn' ? h('small', { class: 'muted', title: 'From ESPN\u2019s official transactions list' }, ' ESPN') : null] : h('span', { class: 'muted' }, 'not recorded')),
       h('td', null, r.unsigned == null ? '–' : `${r.unsigned} day${r.unsigned === 1 ? '' : 's'}`),
-      h('td', null, r.gp || '–'), h('td', null, f1(r.mpg)), h('td', null, f1(r.ppg)),
+      h('td', null, r.gp || '–'), h('td', null, f1(r.mpg)), h('td', null, f1(r.ppg)), h('td', null, f1(r.ws)),
       ...(form ? [h('td', null, Number.isFinite(r.form) ? `${r.form > 0 ? '+' : ''}${r.form.toFixed(1)}` : '–')] : []),
       h('td', null, r.team ? h('span', { class: 'chip tx-signed' }, `Signed: ${displayCode(r.team)}${r.signedAt ? ` · ${fmtKey(r.signedAt)}` : ''}`) : h('span', { class: 'chip' }, 'Free agent')),
       h('td', null, r.watched ? h('input', { class: 'fa-note', type: 'text', value: r.note, maxlength: 300, placeholder: 'e.g. signed in Turkey', 'aria-label': `Note for ${r.name}`,

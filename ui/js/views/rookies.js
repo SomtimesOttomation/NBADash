@@ -4,7 +4,7 @@ import * as S from '../store.js';
 import { h } from '../util.js';
 import { emptyState, teamLogo, avatar, playerLink, headshotUrl } from '../components.js';
 import { displayCode } from '../arenas.js';
-import { applyForm, gpAdjust, GP_WEIGHT } from '../stats.js';
+import { applyForm, gpAdjust, GP_WEIGHT, leagueCtx, winShares } from '../stats.js';
 import { calc } from '../formulas.js';
 
 // Weights of the Rookie score; each input is a percentile among the qualified rookies.
@@ -47,12 +47,15 @@ export function rookieRows(lg, rookies, { form = true } = {}) {
   if (form) applyForm(lg);
   // one line per rookie, adding up stints with different teams
   const by = new Map();
+  const L = leagueCtx(lg);
   for (const p of Object.values(lg.players || {})) {
     const r = rookies.get(String(p.id));
     if (!r) continue;
     let e = by.get(p.id);
-    if (!e) by.set(p.id, e = { id: String(p.id), name: r.name || p.name, team: r.abbr || p.team, pos: r.pos || p.pos, age: r.age, headshot: r.headshot, gp: 0, score: 0, form: NaN, formMin: 0, teamGames: 0, tot: {} });
+    if (!e) by.set(p.id, e = { id: String(p.id), name: r.name || p.name, team: r.abbr || p.team, pos: r.pos || p.pos, age: r.age, headshot: r.headshot, gp: 0, score: 0, ws: 0, wsMin: 0, form: NaN, formMin: 0, teamGames: 0, tot: {} });
     e.gp += p.gp; e.score += p.score;
+    const tm = lg.teams[p.team]; const w = tm ? winShares(p.tot, tm.T, tm.O, tm.games, L) : null;
+    if (w) { e.ws += w.ws; e.wsMin += p.tot.min; }
     for (const [k, v] of Object.entries(p.tot)) e.tot[k] = (e.tot[k] || 0) + v;
     if (Number.isFinite(p.form) && p.tot.min > e.formMin) { e.form = p.form; e.formMin = p.tot.min; }
     e.teamGames = Math.max(e.teamGames, lg.teams[p.team] ? lg.teams[p.team].games : 0);
@@ -60,7 +63,7 @@ export function rookieRows(lg, rookies, { form = true } = {}) {
   const rows = [...by.values()].map((e) => {
     const t = e.tot, g = e.gp || 1, tsa = 2 * ((t.fga || 0) + 0.44 * (t.fta || 0));
     return { ...e, mpg: t.min / g, pts: t.pts / g, reb: t.reb / g, ast: t.ast / g, stocks: ((t.stl || 0) + (t.blk || 0)) / g,
-      ts: tsa > 0 ? (100 * t.pts) / tsa : NaN, gmsc: e.score / g,
+      ts: tsa > 0 ? (100 * t.pts) / tsa : NaN, gmsc: e.score / g, ws48: e.wsMin > 0 ? (48 * e.ws) / e.wsMin : NaN,
       qualified: e.gp > 0 && t.min / g >= ROOKIE_MIN.mpg && e.gp >= Math.ceil(ROOKIE_MIN.gpShare * e.teamGames) };
   });
   const q = rows.filter((r) => r.qualified);
@@ -90,6 +93,8 @@ const COLS = [
   ['stocks', 'STL+BLK', 'stocks', (r) => f1(r.stocks), (r) => r.stocks],
   ['ts', 'TS%', 'ts', (r) => f1(r.ts), (r) => (Number.isFinite(r.ts) ? r.ts : -1)],
   ['gmsc', 'GmSc', 'gamescore', (r) => f1(r.gmsc), (r) => r.gmsc],
+  ['ws', 'WS', 'ws', (r) => (r.wsMin > 0 ? r.ws.toFixed(1) : '\u2013'), (r) => (r.wsMin > 0 ? r.ws : -99)],
+  ['ws48', 'WS/48', 'ws48', (r) => (Number.isFinite(r.ws48) ? r.ws48.toFixed(3) : '\u2013'), (r) => (Number.isFinite(r.ws48) ? r.ws48 : -99)],
   ['form', 'Form', 'form', (r) => sg(r.form), (r) => (Number.isFinite(r.form) ? r.form : -99)],
 ];
 
