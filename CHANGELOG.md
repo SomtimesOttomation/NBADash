@@ -6,7 +6,8 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 
 ## Unreleased
 
-_Nothing yet._
+**Feature**
+- Win Shares and Win Shares per 48 on Leaderboards, Rookie Watch and Free Agents.
 
 ## Released
 
