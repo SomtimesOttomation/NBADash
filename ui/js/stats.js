@@ -46,9 +46,11 @@ const sq = (x) => x * x;
 const fin = (x) => (Number.isFinite(x) ? x : NaN);
 
 // Dean Oliver's individual offensive rating (points produced per 100 individual possessions).
-export function ortg(p, T, O) {
+export function ortg(p, T, O) { const r = ortgParts(p, T, O); return r && r.poss > 0 ? fin(100 * r.pprod / r.poss) : NaN; }
+// Points produced and individual possessions (Dean Oliver), shared by ORtg and Win Shares.
+export function ortgParts(p, T, O) {
   const MP = p.min, tMP = T.min;
-  if (!(MP > 0) || !(tMP > 0) || p.fga + p.fta + p.tov === 0 || !(T.fgm > 0) || !(T.fga - p.fga > 0) || !(T.fgm - p.fgm > 0)) return NaN;
+  if (!(MP > 0) || !(tMP > 0) || p.fga + p.fta + p.tov === 0 || !(T.fgm > 0) || !(T.fga - p.fga > 0) || !(T.fgm - p.fgm > 0)) return null;
   const tFT = T.fta ? T.ftm / T.fta : 0, pFT = p.fta ? p.ftm / p.fta : 0;
   const share = MP / (tMP / 5);
   const qAST = share * (1.14 * ((T.ast - p.ast) / T.fgm)) +
@@ -73,7 +75,33 @@ export function ortg(p, T, O) {
     (((T.pts - T.ftm) - (p.pts - p.ftm)) / (2 * (T.fga - p.fga))) * p.ast;
   const pOrb = p.oreb * tOrbW * tPlayPct * (T.pts / (T.fgm + (1 - sq(1 - tFT)) * 0.4 * T.fta));
   const pprod = (pFg + pAst + p.ftm) * k + pOrb;
-  return totPoss > 0 ? fin(100 * pprod / totPoss) : NaN;
+  return { pprod: fin(pprod), poss: fin(totPoss) };
+}
+
+// League context for Win Shares: points per possession, points per team game and pace, across every team.
+export function leagueCtx(lg) {
+  let pts = 0, poss = 0, games = 0, min = 0;
+  for (const t of Object.values(lg.teams || {})) {
+    if (!t.games) continue;
+    pts += t.T.pts; poss += possBref(t.T, t.O); games += t.games; min += t.T.min > 0 ? t.T.min : t.games * 240;
+  }
+  return games && poss > 0 ? { ppp: pts / poss, ppg: pts / games, pace: (48 * poss) / (min / 5) } : null;
+}
+
+// Basketball-Reference Win Shares: wins a player produced on offense and defense.
+// Marginal points per win = 0.32 x league points per game x (team pace / league pace).
+export function winShares(p, T, O, games, L) {
+  if (!L || !(p.min > 0) || !(T.min > 0)) return null;
+  const tPoss = possBref(T, O);
+  const tPace = (48 * tPoss) / (T.min / 5);
+  const mpw = 0.32 * L.ppg * (tPace / L.pace);
+  if (!(mpw > 0)) return null;
+  const o = ortgParts(p, T, O);
+  const ows = o && o.poss > 0 ? (o.pprod - 0.92 * L.ppp * o.poss) / mpw : 0;
+  const d = drtg(p, T, O);
+  const dws = Number.isFinite(d) ? ((p.min / T.min) * tPoss * (1.08 * L.ppp - d / 100)) / mpw : 0;
+  const ws = ows + dws;
+  return { ows, dws, ws, per48: (48 * ws) / p.min };
 }
 
 // Dean Oliver's individual defensive rating (points allowed per 100 possessions; lower is better).
@@ -128,6 +156,7 @@ export function aggregate(boxes, abbr) {
 
 // ---------------------------------------------------------------- leaders
 const per = (p, k) => p.tot[k] / p.gp;
+const wsOf = (p, a) => (a.L ? winShares(p.tot, a.T, a.O, a.games, a.L) : null);
 const pct = (m, a) => (a > 0 ? (100 * m) / a : NaN);
 
 // minGames-scaled qualification keeps tiny samples out early in the season
@@ -161,6 +190,10 @@ export const LEADER_DEFS = [
   { key: 'tov', loser: 'Most Turnovers', title: 'Turnovers', unit: 'TOV per game', v: (p) => per(p, 'tov'), f: 1, low: true, loserOnly: true },
   { key: 'pf', loser: 'Most Fouls', title: 'Fouls', unit: 'PF per game', v: (p) => per(p, 'pf'), f: 1, low: true, loserOnly: true },
   { key: 'min', title: 'Minutes', unit: 'MPG', v: (p) => per(p, 'min'), f: 1 },
+  { key: 'ws', title: 'Win Shares', unit: 'wins produced', v: (p, a) => wsOf(p, a)?.ws, f: 1, needsLeague: true, noEdge: true,
+    sub: (p) => `${p.gp} GP` },
+  { key: 'ws48', title: 'Win Shares per 48', loser: 'Lowest Win Shares per 48', unit: 'WS/48 (avg \u2248 .100)', v: (p, a) => wsOf(p, a)?.per48, f: 3, needsLeague: true, ok: (p, a) => p.tot.min >= 10 * a.games,
+    sub: (p) => `${p.gp} GP` },
 ];
 
 // Ranks players for every category. ctxFor(p) gives that player's team context {games, T, O}.
@@ -176,7 +209,7 @@ export function gpAdjust(rows, valueOf, gamesOf, k = GP_WEIGHT) {
 }
 
 export function rankAll(players, ctxFor, top, { minMpg = 8, minGpShare = 0, worst = false, gpWeight = 0, league = false, form = false, official = false } = {}) {
-  return LEADER_DEFS.filter((d) => (worst ? d.loser : !d.loserOnly) && (!d.leagueOnly || (league && form))).map((d) => {
+  return LEADER_DEFS.filter((d) => (worst ? d.loser : !d.loserOnly) && (!d.leagueOnly || (league && form)) && (!d.needsLeague || league)).map((d) => {
     const rows = players
       .filter((p) => {
         const c = ctxFor(p);
@@ -261,12 +294,14 @@ export function leagueAdd(lg, box) {
 // League leaders: stricter than the team view (10+ minutes a game, and at least half of the team's games played).
 export function leagueLeaders(lg, top = 5, { form = true } = {}) {
   if (form) applyForm(lg);
-  return rankAll(Object.values(lg.players), (p) => (lg.teams[p.team] ? { games: lg.teams[p.team].games, T: lg.teams[p.team].T, O: lg.teams[p.team].O } : null), top, { minMpg: 0, minGpShare: NBA_MIN.gpShare, gpWeight: GP_WEIGHT, league: true, form, official: true });
+  const L = leagueCtx(lg);
+  return rankAll(Object.values(lg.players), (p) => (lg.teams[p.team] ? { games: lg.teams[p.team].games, T: lg.teams[p.team].T, O: lg.teams[p.team].O, L } : null), top, { minMpg: 0, minGpShare: NBA_MIN.gpShare, gpWeight: GP_WEIGHT, league: true, form, official: true });
 }
 
 export function leagueLosers(lg, top = 5, { form = true } = {}) {
   if (form) applyForm(lg);
-  return rankAll(Object.values(lg.players), (p) => (lg.teams[p.team] ? { games: lg.teams[p.team].games, T: lg.teams[p.team].T, O: lg.teams[p.team].O } : null), top, { minMpg: 10, minGpShare: 0.5, worst: true, gpWeight: GP_WEIGHT, league: true, form });
+  const L = leagueCtx(lg);
+  return rankAll(Object.values(lg.players), (p) => (lg.teams[p.team] ? { games: lg.teams[p.team].games, T: lg.teams[p.team].T, O: lg.teams[p.team].O, L } : null), top, { minMpg: 10, minGpShare: 0.5, worst: true, gpWeight: GP_WEIGHT, league: true, form });
 }
 
 export function fmtValue(v, card) {
