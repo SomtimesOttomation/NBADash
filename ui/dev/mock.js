@@ -138,6 +138,7 @@ function tick() {
 
 export function attach(e) { emit = e; setInterval(tick, 4000); window.__mockEmit = (ev, data) => emit(ev, data); }   // dev: simulate host events
 
+let salFile = null;
 export async function request(cmd, args) {
   await new Promise((r) => setTimeout(r, 15));
   switch (cmd) {
@@ -158,6 +159,7 @@ export async function request(cmd, args) {
       setTimeout(() => { espnTxFile = { fetchedAt: new Date().toISOString(), complete: true, entries }; emit('txhistory', { running: false, ok: true, count: entries.length }); }, 400);
       return true;
     }
+    case 'salaries.fetch': { const ids = (args && args.ids) || []; const pl = {}; ids.forEach((id, i) => { pl[id] = i % 17 === 5 ? null : { salary: 1.2e6 + ((+id * 7919) % 50) * 1e6, years: 1 + (i % 4), option: 0 }; }); salFile = { season: 2027, fetchedAt: new Date().toISOString(), players: pl }; setTimeout(() => emit && emit('salaries', { running: false, n: ids.length, total: ids.length, found: ids.length, missing: 0, failed: 0 }), 30); return true; }
     case 'oncourt.recount': { const n = (args && args.ids || []).length; let k = 0; const t = setInterval(() => { k++; emit && emit('recount', { running: k < n, n: k, total: n, ok: k }); if (k >= n) clearInterval(t); }, 20); return true; }
     case 'traffic.stop': setTimeout(() => emit && emit('traffic', { stopped: true }), 10); return true;
     case 'traffic.resume': setTimeout(() => emit && emit('traffic', { stopped: false }), 10); return true;
@@ -169,6 +171,7 @@ export async function request(cmd, args) {
       if ((m = p.match(/^teams\/(\w+)\.json$/))) return TEAMS.some((t) => t.abbr === m[1]) ? teamFile(m[1]) : null;
       if (p === 'league-stats.json') return leagueFile;
       if (p === 'freeagents.json') return faFile;
+      if (p === 'salaries.json') return salFile;
       if (p === 'espn-transactions.json') return espnTxFile;
       if (p === 'transactions.json') {
         const d = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);

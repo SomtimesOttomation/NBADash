@@ -11,14 +11,15 @@ function New-NbaShared {
           [string]$EspnBase = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba',
           [string]$EspnWebBase = 'https://site.web.api.espn.com/apis/site/v2/sports/basketball/nba',
           [string]$EspnV2Base = 'https://site.api.espn.com/apis/v2/sports/basketball/nba',
-          [string]$EspnCommonBase = 'https://site.web.api.espn.com/apis/common/v3')
+          [string]$EspnCommonBase = 'https://site.web.api.espn.com/apis/common/v3',
+          [string]$EspnCoreBase = 'https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba')
     $traffic = [hashtable]::Synchronized(@{ Requests = 0; Errors = 0; Bytes = [long]0; Wire = [long]0; Last = ''; ByKind = @{}; Started = (Get-Date) })
     return [hashtable]::Synchronized(@{
         CacheDir = $CacheDir; LiveSeconds = $LiveSeconds
         # user-adjustable timing (minutes unless named otherwise); the host overwrites these from settings
         Auto = $false      # automatic fetching is opt-in; when false the worker only fetches what the person asks for
         Tune = [hashtable]::Synchronized(@{ IdleMinutes = 10; OldDayHours = 6; TableLiveMinutes = 15; TableStaleHours = 6 })
-        EspnBase = $EspnBase; EspnWebBase = $EspnWebBase; EspnV2Base = $EspnV2Base; EspnCommonBase = $EspnCommonBase
+        EspnBase = $EspnBase; EspnWebBase = $EspnWebBase; EspnV2Base = $EspnV2Base; EspnCommonBase = $EspnCommonBase; EspnCoreBase = $EspnCoreBase
         Queue = New-Object 'System.Collections.Concurrent.ConcurrentQueue[string]'
         Commands = New-Object 'System.Collections.Concurrent.ConcurrentQueue[object]'
         Watch = [hashtable]::Synchronized(@{})
@@ -547,6 +548,34 @@ function Invoke-NbaWorker {
                     }
                     if ($all.Count -gt 0) { Save-NbaJsonFile (Join-Path $cache 'espn-transactions.json') ([pscustomobject]@{ fetchedAt = (Get-Date).ToString('s'); complete = $ok; entries = $all.ToArray() }) }
                     Push-NbaEvent $Shared 'txhistory' @{ running = $false; ok = ($ok -and $all.Count -gt 0); count = $all.Count; error = $(if ($ok) { '' } else { [string]$Shared.LastError }) }
+                }
+                elseif ($cmd.type -eq 'salaries' -and $cmd.ids) {
+                    # This season's salary per player from ESPN's contracts data, one request per player, one per second,
+                    # only when the person presses the button. Saved to cache\salaries.json; a 404 means ESPN has no
+                    # contract for this season yet (kept as null so it is not asked again on every run).
+                    $et0 = Get-NbaEasternNow
+                    $season = if ($et0.Month -ge 8) { $et0.Year + 1 } else { $et0.Year }
+                    $path = Join-Path $cache 'salaries.json'
+                    $have = @{}
+                    try { $old = [IO.File]::ReadAllText($path) | ConvertFrom-Json; if ($old -and [int]$old.season -eq $season) { foreach ($pp in $old.players.PSObject.Properties) { $have[$pp.Name] = $pp.Value } } } catch { }
+                    $list = @($cmd.ids); $n = 0; $found = 0; $missing = 0; $failed = 0
+                    foreach ($cid in $list) {
+                        if ($Shared.Stop -or $Shared.Halted) { break }
+                        $n++
+                        $c = Get-NbaJson -Shared $Shared -Url ("{0}/athletes/{1}/contracts/{2}" -f $Shared.EspnCoreBase, $cid, $season) -Kind 'contracts'
+                        if ($c -and $null -ne $c.salary) {
+                            $have[[string]$cid] = [pscustomobject]@{ salary = [double]$c.salary; years = [int]$c.yearsRemaining; option = [int]$c.optionType }
+                            $found++
+                        } elseif ([string]$Shared.LastError -match '404') { $have[[string]$cid] = $null; $missing++ }
+                        else { $failed++ }
+                        if ($n % 10 -eq 0 -or $n -eq $list.Count) {
+                            Save-NbaJsonFile $path ([pscustomobject]@{ season = $season; fetchedAt = (Get-Date).ToString('s'); players = [pscustomobject]$have })
+                            Push-NbaEvent $Shared 'salaries' @{ running = $true; n = $n; total = $list.Count; found = $found; missing = $missing; failed = $failed }
+                        }
+                        if ($n -lt $list.Count) { Start-Sleep -Milliseconds 1000 }
+                    }
+                    Save-NbaJsonFile $path ([pscustomobject]@{ season = $season; fetchedAt = (Get-Date).ToString('s'); players = [pscustomobject]$have })
+                    Push-NbaEvent $Shared 'salaries' @{ running = $false; n = $n; total = $list.Count; found = $found; missing = $missing; failed = $failed; stopped = [bool]$Shared.Halted }
                 }
                 elseif ($cmd.type -eq 'recount' -and $cmd.ids) {
                     # Saved final box scores fetched again, one per second, only when the person presses the button,
