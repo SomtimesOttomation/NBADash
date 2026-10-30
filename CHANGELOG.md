@@ -10,6 +10,14 @@ _Nothing yet._
 
 ## Released
 
+### v0.19.0
+
+**Feature**
+- Best Value and Worst Value cards on Leaderboards, from ESPN salaries (load them in Settings > Data).
+
+**Bug/Fix**
+- Fixed stray text in Settings > Data.
+
 ### v0.18.0
 
 **Feature**
