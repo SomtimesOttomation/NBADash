@@ -6,7 +6,8 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 
 ## Unreleased
 
-_Nothing yet._
+**Feature**
+- Ratings formula setting now matches its source for players too: NBA.com uses on-court ratings, Basketball-Reference and Native use Dean Oliver's.
 
 ## Released
 
