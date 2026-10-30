@@ -161,6 +161,7 @@ function timingPanel() {
       h('small', null, 'Live, idle and standings changes apply immediately; the sync values apply to the next sync, including the nightly task.'));
   };
   paint();
+  const unsub = S.subscribe((t) => { if (!box.isConnected) { unsub(); return; } if (t.has('recount') || t.has('league')) paint(); });
   return box;
 }
 
@@ -171,11 +172,21 @@ function ratingsPanel() {
   const paint = () => {
     const cur = S.state.settings.ratingMethod || 'native';
     box.replaceChildren(
-      h('p', { style: { marginBottom: '6px' } }, h('b', null, 'Ratings formula '), h('small', null, 'How team Offensive, Defensive and Net Rating count possessions. Hover any rating for the full formula.')),
+      h('p', { style: { marginBottom: '6px' } }, h('b', null, 'Ratings formula '), h('small', null, 'Which source\u2019s Offensive, Defensive and Net Rating to match. Hover any rating for the full formula.')),
       h('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Ratings formula' }, Object.entries(RATING_METHODS).map(([k, label]) => h('button', {
         type: 'button', role: 'radio', 'aria-checked': cur === k ? 'true' : 'false', class: cur === k ? 'active' : '',
         onclick: () => { S.saveSettings({ ratingMethod: k }); paint(); } }, label))),
-      h('p', null, h('small', null, METHOD_NOTES[cur])));
+      h('p', null, h('small', null, METHOD_NOTES[cur])),
+      cur === 'nba' ? onCourtBox() : null);
+  };
+  // NBA.com player ratings need on-court counts; box scores saved before v0.18 don't have them.
+  const onCourtBox = () => {
+    const lg = S.state.league.data, missing = (lg && lg.noOc) ? lg.noOc.length : 0, R = S.state.recount;
+    if (R && R.running) return h('p', null, h('small', null, `Counting on-court ratings\u2026 ${R.n} of ${R.total} games.`));
+    if (!missing) return h('p', null, h('small', null, R && R.total ? `On-court ratings counted for ${R.ok} older games.` : 'Every saved game has on-court counts.'));
+    return h('p', null, h('small', null, `${missing} saved game${missing === 1 ? '' : 's'} from before on-court counting. Players who played in them show \u2013 for ORtg and DRtg until they are counted. `),
+      h('button', { class: 'btn', type: 'button', disabled: S.state.halted ? true : null, title: `Fetches those ${missing} box scores from ESPN again, one per second`,
+        onclick: () => S.recountOnCourt().catch((e) => { S.state.recount = { running: false, error: e.message }; paint(); }) }, `Count them (${missing} request${missing === 1 ? '' : 's'}, ~${Math.ceil(missing / 60)} min)`));
   };
   paint();
   return box;

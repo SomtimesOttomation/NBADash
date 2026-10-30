@@ -39,7 +39,8 @@ function draw({ el }) {
   else if (!games) body = emptyState('No saved box scores yet', 'League leaders are built from saved box scores. Run Update everything in Settings > Data.');
   else {
     const form = S.state.settings.showForm !== false;
-    if (memo.rev !== L.rev || memo.tab !== tab || memo.form !== form || !memo.cards) memo = { rev: L.rev, tab, form, cards: (tab === 'losers' ? leagueLosers : leagueLeaders)(lg, 5, { form }) };
+    const method = S.state.settings.ratingMethod || 'native';
+    if (memo.rev !== L.rev || memo.tab !== tab || memo.form !== form || memo.method !== method || !memo.cards) memo = { rev: L.rev, tab, form, method, cards: (tab === 'losers' ? leagueLosers : leagueLeaders)(lg, 5, { form, method }) };
     const note = h('p', { class: 'muted', style: { margin: '0 0 12px' } },
       tab === 'losers' ? 'The five worst per category, the mirror image of Leaders. ' : 'Top 5 per category. ',
       'Players with more games get a ', h('span', calc('gpedge'), 'small edge'), ' in close races.', tab === 'losers' ? ' Players need 10+ minutes a game and at least half of their team\u2019s games. Hover a category name for its formula.' : [' Players need 70% of their team\u2019s games; shooting percentages use the NBA\u2019s ', h('span', calc('nbamin'), 'made-shot minimums'), ' instead. Hover a category name for its formula.'],

@@ -49,7 +49,7 @@ function draw({ el, arg }) {
 
 // Top three players of the game in one centred row: 1st, 2nd, 3rd. ESPN has no such field, so it is computed (see stats.js).
 function pyramid(box) {
-  const top = playersOfGame(box, 3);
+  const top = playersOfGame(box, 3, S.state.settings.ratingMethod || 'native');
   if (top.length < 3) return null;
   const heads = new Map();
   box.teams.forEach((t) => { const f = S.state.teamFiles.get(t.team); if (f) f.players.forEach((p) => heads.set(String(p.id), p.headshot)); });

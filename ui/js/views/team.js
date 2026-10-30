@@ -183,7 +183,7 @@ function leadersView(abbr, file) {
   if (!se || se.loading) return emptyState('Loading season data\u2026', se && se.total ? `${se.loaded} of ${se.total} games` : '');
   const agg = se.agg;
   if (!agg || !agg.games) return emptyState('No saved box scores yet', 'Leaders are built from saved box scores. Run Update favorites now or Update everything in Settings > Data.');
-  const cards = leaders(agg);
+  const cards = leaders(agg, 3, S.state.settings.ratingMethod || 'native');
   const missing = se.total - se.have;
   const note = h('p', { class: 'muted', style: { margin: '0 0 12px' } },
     `Season to date \u00b7 ${agg.games} game${agg.games === 1 ? '' : 's'}`, missing > 0 ? ` (${missing} finished game${missing === 1 ? '' : 's'} without a saved box score yet)` : '',

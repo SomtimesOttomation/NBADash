@@ -107,8 +107,11 @@ function box(id) {
     void sum;
     return { team: s.abbr, labels, players, totals: [] };
   };
+  const teamsM = ev.sides.map(mk);
+  // on-court counts for even ids (odd ids act as games saved before on-court counting)
+  const oncourt = ev.state === 'post' && +id % 2 === 0 ? Object.fromEntries(teamsM.flatMap((t) => t.players.filter((p) => !p.dnp).map((p, i) => [p.id, [70 - i * 6, 70 - i * 6, Math.round((70 - i * 6) * (1 + r() * 0.3)), Math.round((70 - i * 6) * (0.95 + r() * 0.3))]]))) : undefined;
   return { id, date: ev.date, name: ev.name, venue: ev.venue, city: 'Mock City', attendance: '18,000',
-    teams: ev.sides.map(mk),
+    teams: teamsM, oncourt,
     poss: ev.state === 'post' && +id % 2 === 0 ? Object.fromEntries(ev.sides.map((s, i) => [s.abbr, 88 - i])) : undefined,
     teamStats: ev.sides.map((s) => ({ team: s.abbr, stats: [{ name: 'fieldGoalsMade-fieldGoalsAttempted', value: '38-85' }, { name: 'fieldGoalPct', value: '45' }, { name: 'totalRebounds', value: '44' }, { name: 'totalTurnovers', value: '12' }] })),
     lastScore: ev.state === 'in' ? { text: 'Tyrese Maxey makes 26-foot three point jumper (Joel Embiid assists)', value: 3, team: ev.sides[0].abbr, period: 2, clock: '5:21', type: 'Three Point Jump Shot' } : null,
@@ -155,6 +158,7 @@ export async function request(cmd, args) {
       setTimeout(() => { espnTxFile = { fetchedAt: new Date().toISOString(), complete: true, entries }; emit('txhistory', { running: false, ok: true, count: entries.length }); }, 400);
       return true;
     }
+    case 'oncourt.recount': { const n = (args && args.ids || []).length; let k = 0; const t = setInterval(() => { k++; emit && emit('recount', { running: k < n, n: k, total: n, ok: k }); if (k >= n) clearInterval(t); }, 20); return true; }
     case 'traffic.stop': setTimeout(() => emit && emit('traffic', { stopped: true }), 10); return true;
     case 'traffic.resume': setTimeout(() => emit && emit('traffic', { stopped: false }), 10); return true;
     case 'cache.read': {

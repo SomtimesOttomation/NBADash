@@ -230,6 +230,110 @@ function Get-NbaPossessions {
     } catch { return $null }
 }
 
+function Get-NbaOnCourt {
+    # On-court ratings, NBA.com style: who is on the floor for every possession and every point, from the play-by-play
+    # that already comes with the game summary (no extra request). Lineups start from the box score starters; each period's
+    # lineup is the players seen in a play before being subbed in. Plays are ordered by period and game clock, so ESPN's
+    # late-logged substitutions land where they happened.
+    # Returns @{ playerId = @(offPoss, defPoss, ptsFor, ptsAgainst) } or $null when the play-by-play is missing or a lineup
+    # cannot be worked out.
+    param($Sum)
+    try {
+        $teams = @($Sum.boxscore.teams)
+        if ($teams.Count -ne 2) { return $null }
+        $ids = @([string]$teams[0].team.id, [string]$teams[1].team.id)
+        $homeId = [string](@($Sum.header.competitions[0].competitors | Where-Object { $_.homeAway -eq 'home' })[0].team.id)
+        if ($ids -notcontains $homeId) { return $null }
+        $roster = @{}; $starters = @{ $ids[0] = @(); $ids[1] = @() }
+        foreach ($g in @($Sum.boxscore.players)) {
+            $tid = [string]$g.team.id
+            foreach ($a in @(($g.statistics | Select-Object -First 1).athletes)) {
+                $aid = [string]$a.athlete.id
+                $roster[$aid] = $tid
+                if ($a.starter) { $starters[$tid] += $aid }
+            }
+        }
+        $secs = { param($c) $c = [string]$c; if ($c -match '^(\d+):(\d+(?:\.\d+)?)$') { [int]$Matches[1] * 60 + [double]$Matches[2] } elseif ($c -match '^\d+(\.\d+)?$') { [double]$c } else { 0 } }
+        $plays = @($Sum.plays | Where-Object { $_ } | Sort-Object @{ e = { [int]$_.period.number } }, @{ e = { - (& $secs $_.clock.displayValue) } }, @{ e = { [int]$_.sequenceNumber } })
+        if ($plays.Count -lt 100) { return $null }
+        $partsOf = { param($p) @($p.participants | Where-Object { $_ -and $_.athlete } | ForEach-Object { [string]$_.athlete.id }) }
+        $oc = @{}
+        $add = { param($aid, $k, $v) if (-not $oc.ContainsKey($aid)) { $oc[$aid] = @(0, 0, 0, 0) }; $oc[$aid][$k] += $v }
+        $other = { param($t) if ($t -eq $ids[0]) { $ids[1] } else { $ids[0] } }
+        $on = $null
+        $st = @{ cur = $null; active = $false; last = ''; per = $null; h = 0; a = 0 }
+        $end = {
+            param($t)
+            foreach ($x in @($on[$t])) { & $add $x 0 1 }
+            foreach ($x in @($on[(& $other $t)])) { & $add $x 1 1 }
+            $st.cur = (& $other $t); $st.active = $false
+        }
+        foreach ($p in $plays) {
+            $typ = [string]$p.type.text
+            $t = [string]$p.team.id
+            $pn = [int]$p.period.number
+            $clk = [string]$p.clock.displayValue
+            if ($pn -ne $st.per) {
+                if ($null -ne $st.per -and $st.cur -and $st.active) { & $end $st.cur }
+                $st.cur = $null; $st.active = $false; $st.per = $pn
+                $on = @{ $ids[0] = New-Object System.Collections.ArrayList; $ids[1] = New-Object System.Collections.ArrayList }
+                if ($pn -eq 1) {
+                    foreach ($k in $ids) { foreach ($x in $starters[$k]) { [void]$on[$k].Add($x) } }
+                } else {
+                    $seen = @{}
+                    foreach ($q in $plays) {
+                        if ([int]$q.period.number -ne $pn) { continue }
+                        $qp = & $partsOf $q
+                        if ([string]$q.type.text -eq 'Substitution' -and $qp.Count -ge 2) {
+                            if (-not $seen.ContainsKey($qp[0])) { $seen[$qp[0]] = 'in' }
+                            if (-not $seen.ContainsKey($qp[1])) { $seen[$qp[1]] = 'start' }
+                        } else { foreach ($x in $qp) { if (-not $seen.ContainsKey($x)) { $seen[$x] = 'start' } } }
+                    }
+                    foreach ($x in $seen.Keys) { if ($seen[$x] -eq 'start' -and $roster.ContainsKey($x)) { [void]$on[$roster[$x]].Add($x) } }
+                }
+                foreach ($k in $ids) { if ($on[$k].Count -ne 5) { return $null } }
+            }
+            # points, from the running score (overturned baskets come back off the same way)
+            $hs = if ($null -ne $p.homeScore) { [int]$p.homeScore } else { $st.h }
+            $as = if ($null -ne $p.awayScore) { [int]$p.awayScore } else { $st.a }
+            $dh = $hs - $st.h; $da = $as - $st.a; $st.h = $hs; $st.a = $as
+            foreach ($pair in @(@($homeId, $dh), @((& $other $homeId), $da))) {
+                if ($pair[1] -ne 0) {
+                    foreach ($x in @($on[$pair[0]])) { & $add $x 2 $pair[1] }
+                    foreach ($x in @($on[(& $other $pair[0])])) { & $add $x 3 $pair[1] }
+                }
+            }
+            if ($typ -eq 'Substitution') {
+                $sp = & $partsOf $p
+                if ($sp.Count -ge 2 -and $on.ContainsKey($t)) { [void]$on[$t].Remove($sp[1]); if (-not $on[$t].Contains($sp[0])) { [void]$on[$t].Add($sp[0]) } }
+                continue
+            }
+            # possessions: same rules as Get-NbaPossessions
+            if ($typ -eq 'End Period' -or $typ -eq 'End Game') { if ($st.cur -and $st.active) { & $end $st.cur }; $st.cur = $null; $st.active = $false; continue }
+            if ($ids -notcontains $t) { continue }
+            if ($typ -eq 'Jumpball') { $st.cur = $t; $st.active = $true; continue }
+            if ($typ -like 'Free Throw*') {
+                $st.cur = $t; $st.active = $true
+                $special = ($typ -match 'Technical|Flagrant|Clear Path')
+                if ($p.scoringPlay -and -not $special -and $typ -match '(\d+) of (\d+)' -and $Matches[1] -eq $Matches[2]) {
+                    if ($st.last -ne ('fg|' + $t + '|' + $pn + '|' + $clk)) { & $end $t; $st.last = 'ft|' + $t + '|' + $pn + '|' + $clk }
+                }
+                continue
+            }
+            if ($typ -like '*Turnover*' -or $typ -eq 'Traveling') { & $end $t; $st.last = 'to'; continue }
+            if ($typ -eq 'Defensive Rebound') { $o = & $other $t; if ($st.cur -eq $o) { & $end $o }; $st.cur = $t; $st.active = $true; continue }
+            if ($typ -eq 'Offensive Rebound') { $st.cur = $t; $st.active = $true; continue }
+            if ($p.shootingPlay) {
+                $st.cur = $t; $st.active = $true
+                if ($p.scoringPlay) { & $end $t; $st.last = 'fg|' + $t + '|' + $pn + '|' + $clk }
+            }
+        }
+        $out = [ordered]@{}
+        foreach ($k in $oc.Keys) { $out[$k] = @($oc[$k]) }
+        return [pscustomobject]$out
+    } catch { return $null }
+}
+
 function ConvertTo-NbaBox {
     param($Sum, $Game)
     $boxTeams = @($Sum.boxscore.players | ForEach-Object {
@@ -276,6 +380,7 @@ function ConvertTo-NbaBox {
         attendance = $Sum.gameInfo.attendance
         teams = $boxTeams; teamStats = $teamStats; syncedAt = (Get-Date).ToString('s')
         poss = $(if ($gState -eq 'post') { Get-NbaPossessions $Sum } else { $null })
+        oncourt = $(if ($gState -eq 'post') { Get-NbaOnCourt $Sum } else { $null })
         flow = (Get-NbaFlow $Sum)
         injuries = @(Get-NbaBoxInjuries $Sum)
     }
@@ -442,6 +547,27 @@ function Invoke-NbaWorker {
                     }
                     if ($all.Count -gt 0) { Save-NbaJsonFile (Join-Path $cache 'espn-transactions.json') ([pscustomobject]@{ fetchedAt = (Get-Date).ToString('s'); complete = $ok; entries = $all.ToArray() }) }
                     Push-NbaEvent $Shared 'txhistory' @{ running = $false; ok = ($ok -and $all.Count -gt 0); count = $all.Count; error = $(if ($ok) { '' } else { [string]$Shared.LastError }) }
+                }
+                elseif ($cmd.type -eq 'recount' -and $cmd.ids) {
+                    # Saved final box scores fetched again, one per second, only when the person presses the button,
+                    # so they gain on-court ratings (NBA.com formula). Stops with the pause switch.
+                    $list = @($cmd.ids); $n = 0; $okN = 0
+                    foreach ($rid in $list) {
+                        if ($Shared.Stop -or $Shared.Halted) { break }
+                        $n++
+                        $sum = Get-NbaJson -Shared $Shared -Url ("{0}/summary?region=us&lang=en&contentorigin=espn&event={1}" -f $Shared.EspnWebBase, $rid) -Kind 'boxscore'
+                        $st0 = try { [string]$sum.header.competitions[0].status.type.state } catch { '' }
+                        if ($sum -and $sum.boxscore -and $st0 -eq 'post') {
+                            $old = $null
+                            try { $old = [IO.File]::ReadAllText((Join-Path $cache "boxscores\$rid.json")) | ConvertFrom-Json } catch { }
+                            $g = [pscustomobject]@{ id = $rid; date = $(if ($old) { $old.date } else { '' }); name = $(if ($old) { $old.name } else { '' }) }
+                            Save-NbaJsonFile (Join-Path $cache "boxscores\$rid.json") (ConvertTo-NbaBox -Sum $sum -Game $g)
+                            $okN++
+                        }
+                        Push-NbaEvent $Shared 'recount' @{ running = $true; n = $n; total = $list.Count; ok = $okN }
+                        if ($n -lt $list.Count) { Start-Sleep -Milliseconds 1000 }
+                    }
+                    Push-NbaEvent $Shared 'recount' @{ running = $false; n = $n; total = $list.Count; ok = $okN; stopped = [bool]$Shared.Halted }
                 }
                 elseif ($cmd.type -eq 'psearch' -and $cmd.q) {
                     $url = "{0}/search?query={1}&limit=8&type=player&sport=basketball&league=nba" -f $Shared.EspnCommonBase, [Uri]::EscapeDataString([string]$cmd.q)

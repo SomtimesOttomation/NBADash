@@ -344,6 +344,11 @@ function Invoke-PageCommand {
         }
         'schedule.remove' { Reply $Msg.id ((Set-NightlyTask -Time '' -Remove $true) | ConvertTo-Json -Compress) }
         'live.refresh' { $script:Shared.RefreshNow = $true; Reply $Msg.id 'true' }
+        'oncourt.recount' {
+            $ids = @(@($a.ids) | ForEach-Object { [string]$_ } | Where-Object { $_ -match '^\d+$' } | Select-Object -First 1500)
+            if ($script:Halted -or -not $ids.Count) { Reply $Msg.id 'false'; return }
+            $script:Shared.Commands.Enqueue(@{ type = 'recount'; ids = $ids }); Reply $Msg.id 'true'
+        }
         'txhistory.fetch' { $script:Shared.Commands.Enqueue(@{ type = 'txhistory' }); Reply $Msg.id 'true' }
         'sync.run' {
             $mode = if ($a.mode -in 'favorites', 'all', 'force', 'team', 'history', 'historyBoxes') { $a.mode } else { 'favorites' }
