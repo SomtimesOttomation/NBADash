@@ -570,6 +570,18 @@ export async function loadSeason(abbr, force) {
 }
 
 // League-wide season totals, kept in cache\league-stats.json and topped up one new saved box score at a time.
+// NBA.com ratings: fetch older saved box scores again so they gain on-court counts, then rebuild league stats locally.
+export async function recountOnCourt() {
+  const ids = (state.league.data && state.league.data.noOc) || [];
+  if (!ids.length) return false;
+  state.recount = { running: true, n: 0, total: ids.length, ok: 0 }; notify('recount');
+  return bridge.request('oncourt.recount', { ids });
+}
+export async function rebuildLeague() {
+  try { await bridge.request('cache.write', { path: 'league-stats.json', text: JSON.stringify(newLeague()) }); } catch (e) { /* rebuilt in memory anyway */ }
+  state.league.data = null; state.season.clear(); notify('league');
+  return loadLeague();
+}
 export async function loadLeague() {
   const L = state.league;
   if (L.loading) return L;
@@ -639,6 +651,7 @@ export async function init() {
   bridge.on('host.visible', () => { if (state.settings.autoRefresh && !state.halted) bridge.request('live.refresh').catch(() => {}); notify('visible'); });
   bridge.on('host.hidden', () => notify('hidden'));
   bridge.on('traffic', (d) => { state.halted = !!(d && d.stopped); notify('traffic'); });
+  bridge.on('recount', (d) => { state.recount = d; notify('recount'); if (d && !d.running) rebuildLeague(); });
   bridge.on('txhistory', (d) => { state.txh = d; notify('fa'); if (d && !d.running) loadEspnTx(true); });
 
   bridge.on('scoreboard', onScoreboard);

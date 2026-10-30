@@ -46,6 +46,20 @@ const sq = (x) => x * x;
 const fin = (x) => (Number.isFinite(x) ? x : NaN);
 
 // Dean Oliver's individual offensive rating (points produced per 100 individual possessions).
+// On-court ratings (NBA.com method): possessions and points while the player was on the floor, counted from the
+// play-by-play when the box score was saved. box.oncourt[id] = [offPoss, defPoss, ptsFor, ptsAgainst].
+export function addOnCourt(e, box, id) {
+  const v = box && box.oncourt ? box.oncourt[id] : null;
+  if (!Array.isArray(v) || v.length < 4) return;
+  const oc = e.oc || (e.oc = [0, 0, 0, 0]);
+  for (let i = 0; i < 4; i++) oc[i] += Number(v[i]) || 0;
+  e.ocGames = (e.ocGames || 0) + 1;
+}
+// Player ORtg / DRtg for the chosen formula: NBA.com uses on-court ratings (only when every game he played has them);
+// Native and Basketball-Reference use Dean Oliver's box-score estimate, which is what Basketball-Reference shows.
+export const onCourtReady = (p) => !!(p.oc && p.ocGames >= p.gp && p.oc[0] > 0 && p.oc[1] > 0);
+export function playerOrtg(p, a) { return a.method === 'nba' ? (onCourtReady(p) ? (100 * p.oc[2]) / p.oc[0] : NaN) : ortg(p.tot, a.T, a.O); }
+export function playerDrtg(p, a) { return a.method === 'nba' ? (onCourtReady(p) ? (100 * p.oc[3]) / p.oc[1] : NaN) : drtg(p.tot, a.T, a.O); }
 export function ortg(p, T, O) { const r = ortgParts(p, T, O); return r && r.poss > 0 ? fin(100 * r.pprod / r.poss) : NaN; }
 // Points produced and individual possessions (Dean Oliver), shared by ORtg and Win Shares.
 export function ortgParts(p, T, O) {
@@ -145,6 +159,7 @@ export function aggregate(boxes, abbr) {
       if (!e) { e = { id: p.id, name: p.name, team: abbr, pos: p.pos, jersey: p.jersey, gp: 0, gs: 0, score: 0, dd: 0, tot: emptyTot() }; players.set(p.id, e); }
       e.gp++; e.name = p.name; e.pos = p.pos || e.pos; e.jersey = p.jersey || e.jersey;
       addTot(e.tot, l);
+      addOnCourt(e, box, p.id);
       e.score += gameScore(l);
       if ([l.pts, l.reb, l.ast, l.stl, l.blk].filter((x) => x >= 10).length >= 2) e.dd++;
       if (p.starter) { e.gs++; starters.push(p.id); }
@@ -176,8 +191,8 @@ export const LEADER_DEFS = [
   { key: 'stl', title: 'Steals', unit: 'SPG', v: (p) => per(p, 'stl'), f: 1 },
   { key: 'blk', title: 'Blocks', unit: 'BPG', v: (p) => per(p, 'blk'), f: 1 },
   { key: 'stocks', title: 'Stocks (Steals + Blocks)', unit: 'per game', v: (p) => (p.tot.stl + p.tot.blk) / p.gp, f: 1 },
-  { key: 'ortg', loser: 'Worst Offensive Rating', title: 'Offensive Rating', unit: 'pts / 100 poss', v: (p, a) => ortg(p.tot, a.T, a.O), f: 1, ok: (p, a) => p.tot.min >= 10 * a.games, note: 'Dean Oliver estimate' },
-  { key: 'drtg', loser: 'Worst Defensive Rating', title: 'Defensive Rating', unit: 'lower is better', v: (p, a) => drtg(p.tot, a.T, a.O), f: 1, low: true, ok: (p, a) => p.tot.min >= 10 * a.games, note: 'Dean Oliver estimate' },
+  { key: 'ortg', loser: 'Worst Offensive Rating', title: 'Offensive Rating', unit: 'pts / 100 poss', v: (p, a) => playerOrtg(p, a), f: 1, ok: (p, a) => p.tot.min >= 10 * a.games, note: (a) => (a && a.method === 'nba' ? 'on-court, NBA.com method' : 'Dean Oliver estimate') },
+  { key: 'drtg', loser: 'Worst Defensive Rating', title: 'Defensive Rating', unit: 'lower is better', v: (p, a) => playerDrtg(p, a), f: 1, low: true, ok: (p, a) => p.tot.min >= 10 * a.games, note: (a) => (a && a.method === 'nba' ? 'on-court, NBA.com method' : 'Dean Oliver estimate') },
   { key: 'pm', loser: 'Worst Plus / Minus', title: 'Plus / Minus', unit: 'per game', v: (p) => per(p, 'pm'), f: 1, signed: true },
   { key: 'efg', loser: 'Worst Effective FG%', title: 'Effective FG%', unit: 'eFG%', v: (p) => (p.tot.fga > 0 ? (100 * (p.tot.fgm + 0.5 * p.tot.tpm)) / p.tot.fga : NaN), f: 1, suffix: '%', ok: (p, a) => p.tot.fga >= 3 * a.games, okNba: (p, a) => p.tot.fgm >= nbaMin('fg', a.games), sub: (p) => `${p.tot.fgm}/${p.tot.fga} FG \u00b7 ${p.tot.tpm} 3PM`, note: '3-pointers count 1.5x' },
   { key: 'splits', loser: 'Worst Shooting Splits', title: 'Shooting Splits', unit: 'FG% / 3P% / FT%', v: (p) => (pct(p.tot.fgm, p.tot.fga) + pct(p.tot.tpm, p.tot.tpa) + pct(p.tot.ftm, p.tot.fta)) / 3, f: 1, suffix: '%',
@@ -208,7 +223,8 @@ export function gpAdjust(rows, valueOf, gamesOf, k = GP_WEIGHT) {
   return (r) => { const v = valueOf(r), n = gamesOf(r); return k > 0 && n > 0 ? (n * v + k * mean) / (n + k) : v; };
 }
 
-export function rankAll(players, ctxFor, top, { minMpg = 8, minGpShare = 0, worst = false, gpWeight = 0, league = false, form = false, official = false } = {}) {
+export function rankAll(players, ctxFor, top, { minMpg = 8, minGpShare = 0, worst = false, gpWeight = 0, league = false, form = false, official = false, method = 'native' } = {}) {
+  const base = ctxFor; ctxFor = (p) => { const c = base(p); return c ? { ...c, method } : c; };
   return LEADER_DEFS.filter((d) => (worst ? d.loser : !d.loserOnly) && (!d.leagueOnly || (league && form)) && (!d.needsLeague || league)).map((d) => {
     const rows = players
       .filter((p) => {
@@ -219,17 +235,17 @@ export function rankAll(players, ctxFor, top, { minMpg = 8, minGpShare = 0, wors
       .filter((r) => Number.isFinite(r.value));
     const adj = gpAdjust(rows, (r) => r.value, (r) => r.p.gp, d.noEdge ? 0 : gpWeight);
     rows.forEach((r) => { r.rank = adj(r); });
-    return { key: d.key, title: worst ? d.loser : d.title, unit: d.unit, f: d.f, suffix: d.suffix || '', signed: !!d.signed, note: d.note || '', rows: rows
+    return { key: d.key, title: worst ? d.loser : d.title, unit: d.unit, f: d.f, suffix: d.suffix || '', signed: !!d.signed, note: (typeof d.note === 'function' ? d.note({ method }) : d.note) || '', rows: rows
       .sort((a, b) => ((!!d.low !== worst) ? a.rank - b.rank : b.rank - a.rank) || b.p.tot.min - a.p.tot.min)   // ties: the player with more minutes ranks first
       .slice(0, top)
       .map((r) => ({ id: r.p.id, name: r.p.name, team: r.p.team, jersey: r.p.jersey, value: r.value, text: d.text ? d.text(r.p) : '', sub: d.sub ? d.sub(r.p) : `${r.p.gp} GP` })) };
   });
 }
 
-export function leaders(agg, top = 3) { return rankAll(agg.players, () => agg, top); }
+export function leaders(agg, top = 3, method = 'native') { return rankAll(agg.players, () => agg, top, { method }); }
 
 // ---------------------------------------------------------------- league-wide, built one saved box score at a time
-export const LEAGUE_VERSION = 6;   // 6: results by opponent (East-West Report); 5: per-game log per player (Form rating)
+export const LEAGUE_VERSION = 7;   // 7: on-court possessions and points per player (NBA.com ratings); 6: results by opponent (East-West Report); 5: per-game log per player (Form rating)
 export const LEAGUE_VERSION_PREV = 4;   // 4: rebuild once to add counted possessions (Native ratings) and opponents faced (SRS)
 
 // ---------------------------------------------------------------- possessions (team ratings formula setting)
@@ -256,6 +272,7 @@ export const boxComplete = (box) => !!box && Array.isArray(box.teams) && box.tea
 
 export function leagueAdd(lg, box) {
   if (!boxComplete(box)) return false;
+  if (!box.oncourt && box.id) (lg.noOc || (lg.noOc = [])).push(String(box.id));      // saved before on-court counting (NBA.com ratings)
   for (let i = 0; i < 2; i++) {
     const mine = box.teams[i], theirs = box.teams[1 - i];
     const te = lg.teams[mine.team] || (lg.teams[mine.team] = { games: 0, T: emptyTot(), O: emptyTot(), nat: { o: 0, d: 0, counted: 0 }, opp: {} });
@@ -283,6 +300,7 @@ export function leagueAdd(lg, box) {
       e.gp++; e.name = p.name; e.pos = p.pos || e.pos; e.jersey = p.jersey || e.jersey;
       (e.log || (e.log = [])).push([dayNum(box.date), Math.round(l.min), Math.round(gameScore(l) * 10) / 10, l.pm]);   // per-game line for the Form rating
       addTot(e.tot, l);
+      addOnCourt(e, box, p.id);
       e.score += gameScore(l);
       if ([l.pts, l.reb, l.ast, l.stl, l.blk].filter((x) => x >= 10).length >= 2) e.dd++;
       if (p.starter) e.gs++;
@@ -292,16 +310,16 @@ export function leagueAdd(lg, box) {
 }
 
 // League leaders: stricter than the team view (10+ minutes a game, and at least half of the team's games played).
-export function leagueLeaders(lg, top = 5, { form = true } = {}) {
+export function leagueLeaders(lg, top = 5, { form = true, method = 'native' } = {}) {
   if (form) applyForm(lg);
   const L = leagueCtx(lg);
-  return rankAll(Object.values(lg.players), (p) => (lg.teams[p.team] ? { games: lg.teams[p.team].games, T: lg.teams[p.team].T, O: lg.teams[p.team].O, L } : null), top, { minMpg: 0, minGpShare: NBA_MIN.gpShare, gpWeight: GP_WEIGHT, league: true, form, official: true });
+  return rankAll(Object.values(lg.players), (p) => (lg.teams[p.team] ? { games: lg.teams[p.team].games, T: lg.teams[p.team].T, O: lg.teams[p.team].O, L } : null), top, { minMpg: 0, minGpShare: NBA_MIN.gpShare, gpWeight: GP_WEIGHT, league: true, form, official: true, method });
 }
 
-export function leagueLosers(lg, top = 5, { form = true } = {}) {
+export function leagueLosers(lg, top = 5, { form = true, method = 'native' } = {}) {
   if (form) applyForm(lg);
   const L = leagueCtx(lg);
-  return rankAll(Object.values(lg.players), (p) => (lg.teams[p.team] ? { games: lg.teams[p.team].games, T: lg.teams[p.team].T, O: lg.teams[p.team].O, L } : null), top, { minMpg: 10, minGpShare: 0.5, worst: true, gpWeight: GP_WEIGHT, league: true, form });
+  return rankAll(Object.values(lg.players), (p) => (lg.teams[p.team] ? { games: lg.teams[p.team].games, T: lg.teams[p.team].T, O: lg.teams[p.team].O, L } : null), top, { minMpg: 10, minGpShare: 0.5, worst: true, gpWeight: GP_WEIGHT, league: true, form, method });
 }
 
 export function fmtValue(v, card) {
@@ -312,7 +330,12 @@ export function fmtValue(v, card) {
 // ---------------------------------------------------------------- player of the game
 // ESPN has no "player of the game" field, so it is computed: Game Score ranks everyone on both teams
 // (it rewards points, rebounds, assists, steals and blocks and charges misses and turnovers); ties go to plus/minus.
-export function playersOfGame(box, top = 3) {
+function gameRatings(l, T, O, box, id, method) {
+  if (method !== 'nba') return { ortg: ortg(l, T, O), drtg: drtg(l, T, O) };
+  const v = box.oncourt ? box.oncourt[id] : null;
+  return Array.isArray(v) && v[0] > 0 && v[1] > 0 ? { ortg: (100 * v[2]) / v[0], drtg: (100 * v[3]) / v[1] } : { ortg: NaN, drtg: NaN };
+}
+export function playersOfGame(box, top = 3, method = 'native') {
   const out = [];
   for (const team of box.teams) {
     const other = box.teams.find((t) => t !== team);
@@ -322,7 +345,7 @@ export function playersOfGame(box, top = 3) {
       if (!played(p)) continue;
       const l = lineOf(team.labels, p.stats);
       if (!(l.min > 0) && !l.pts) continue;
-      out.push({ id: p.id, name: p.name, team: team.team, jersey: p.jersey, pos: p.pos, line: l, score: gameScore(l), ortg: ortg(l, T, O), drtg: drtg(l, T, O) });
+      out.push({ id: p.id, name: p.name, team: team.team, jersey: p.jersey, pos: p.pos, line: l, score: gameScore(l), ...gameRatings(l, T, O, box, p.id, method) });
     }
   }
   out.sort((a, b) => b.score - a.score || b.line.pm - a.line.pm || b.line.min - a.line.min);

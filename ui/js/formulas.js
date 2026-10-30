@@ -5,9 +5,9 @@ import { h } from './util.js';
 import { RATING_METHODS } from './stats.js';
 
 export const METHOD_NOTES = {
-  native: 'Counts the real possessions in each game from the play-by-play saved with the box score. Most accurate. Games saved before this was added, or without play-by-play, use the Basketball-Reference estimate instead.',
-  bref: 'Basketball-Reference’s estimate (Dean Oliver): 0.4 × free throws and a weighted offensive-rebound adjustment, averaged with the opponent’s count. Within about 2 possessions a game of the real count.',
-  nba: 'The NBA.com-style estimate: FGA − ORB + TOV + 0.436 × FTA, averaged with the opponent’s count. Simple, and tends to overcount by a few possessions a game, so ratings read slightly low.',
+  native: 'Teams: counts the real possessions in each game from the play-by-play saved with the box score. Players: Dean Oliver\u2019s box-score estimate. Most accurate for teams. Games saved before this was added, or without play-by-play, use the Basketball-Reference estimate instead.',
+  bref: 'Matches Basketball-Reference. Players: Dean Oliver\u2019s individual ratings, exactly as Basketball-Reference shows them. Teams: Basketball-Reference’s estimate (Dean Oliver): 0.4 × free throws and a weighted offensive-rebound adjustment, averaged with the opponent’s count. Within about 2 possessions a game of the real count.',
+  nba: 'Matches NBA.com. Teams: FGA − ORB + TOV + 0.436 × FTA, averaged with the opponent’s count. Players: on-court ratings, the points scored and allowed per 100 possessions while the player is on the floor, counted from the play-by-play.',
 };
 
 const POSS = {
@@ -20,15 +20,21 @@ const methodLine = () => `Formula setting: ${RATING_METHODS[method()]}`;
 
 // key -> (scope) => { title, formula, why, note? }
 const DEFS = {
-  ortg: (scope) => (scope === 'player' ? {
+  ortg: (scope) => (scope === 'player' && method() === 'nba' ? {
+    title: 'Offensive Rating (player, on-court)', formula: 'ORtg = 100 \u00d7 Team points while he is on the floor\n      / Team possessions while he is on the floor',
+    why: 'NBA.com\u2019s player rating: how the team scores with him on the court. Counted from the play-by-play (substitutions and possessions) when the box score is saved. Shows \u2013 until every game he played has been counted.', note: methodLine(),
+  } : scope === 'player' ? {
     title: 'Offensive Rating (player)',
     formula: 'ORtg = 100 × Points Produced / Individual Possessions',
-    why: 'Dean Oliver’s method, the one Basketball-Reference uses. Points Produced credits made shots, a share of assisted baskets and offensive rebounds; Individual Possessions adds the misses and turnovers the player used. Always this method: NBA.com’s player ratings need on-court tracking that box scores don’t have.',
+    why: 'Dean Oliver’s method, the one Basketball-Reference uses. Points Produced credits made shots, a share of assisted baskets and offensive rebounds; Individual Possessions adds the misses and turnovers the player used. Used with the Native and Basketball-Reference formula settings; the NBA.com setting uses on-court ratings instead.',
   } : {
     title: 'Offensive Rating (team)', formula: `ORtg = 100 × Points / Poss\n\n${POSS[method()]}`,
     why: 'Points scored per 100 possessions. Using possessions instead of games removes the effect of pace, so fast and slow teams compare fairly.', note: methodLine(),
   }),
-  drtg: (scope) => (scope === 'player' ? {
+  drtg: (scope) => (scope === 'player' && method() === 'nba' ? {
+    title: 'Defensive Rating (player, on-court)', formula: 'DRtg = 100 \u00d7 Opponent points while he is on the floor\n      / Opponent possessions while he is on the floor',
+    why: 'NBA.com\u2019s player rating: points allowed per 100 possessions with him on the court. Lower is better. Counted from the play-by-play when the box score is saved.', note: methodLine(),
+  } : scope === 'player' ? {
     title: 'Defensive Rating (player)',
     formula: 'DRtg = Team DRtg + 0.2 × (100 × Opp pts per scoring poss × (1 − Stop%) − Team DRtg)',
     why: 'Dean Oliver’s estimate of points allowed per 100 possessions while on the floor. Stops come from steals, blocks, defensive rebounds and a share of forced misses and turnovers. Box scores don’t record who guarded whom, so it leans heavily on the team’s defense. Lower is better.',
