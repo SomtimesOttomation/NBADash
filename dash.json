@@ -10,7 +10,7 @@
   "entry": "index.html",
   "standalone": "Start-NBADash.bat",
   "dataSources": [
-    { "name": "ESPN public web endpoints (scores, stats, rosters)", "terms": "https://disneytermsofuse.com/english/" },
+    { "name": "ESPN public web endpoints (scores, stats, rosters, contracts)", "terms": "https://disneytermsofuse.com/english/" },
     { "name": "GitHub releases (update check)", "terms": "https://docs.github.com/en/site-policy/github-terms/github-terms-of-service" }
   ]
 }

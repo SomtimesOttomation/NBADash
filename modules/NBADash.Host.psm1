@@ -17,7 +17,7 @@ $script:WorkerPs = $null
 $script:WorkerHandle = $null
 $script:Halted = $false          # launcher stop button pressed: no data fetching until the person resumes inside the dash
 
-$script:Allowed = @('teams.json', 'standings.json', 'injuries.json', 'sync-state.json', 'league-stats.json', 'transactions.json', 'freeagents.json', 'espn-transactions.json')
+$script:Allowed = @('teams.json', 'standings.json', 'injuries.json', 'sync-state.json', 'league-stats.json', 'transactions.json', 'freeagents.json', 'espn-transactions.json', 'salaries.json')
 $script:TuneDefaults = [ordered]@{ idleMinutes = @(10, 1, 120); oldDayHours = @(6, 1, 48); tableLiveMinutes = @(15, 5, 120); tableStaleHours = @(6, 1, 48); teamFreshHours = @(20, 1, 168); tableFreshHours = @(4, 1, 48); backfillDays = @(7, 1, 30) }
 
 # ---------------------------------------------------------------- page messages
@@ -344,6 +344,11 @@ function Invoke-PageCommand {
         }
         'schedule.remove' { Reply $Msg.id ((Set-NightlyTask -Time '' -Remove $true) | ConvertTo-Json -Compress) }
         'live.refresh' { $script:Shared.RefreshNow = $true; Reply $Msg.id 'true' }
+        'salaries.fetch' {
+            $ids = @(@($a.ids) | ForEach-Object { [string]$_ } | Where-Object { $_ -match '^\d+$' } | Select-Object -Unique -First 900)
+            if ($script:Halted -or -not $ids.Count) { Reply $Msg.id 'false'; return }
+            $script:Shared.Commands.Enqueue(@{ type = 'salaries'; ids = $ids }); Reply $Msg.id 'true'
+        }
         'oncourt.recount' {
             $ids = @(@($a.ids) | ForEach-Object { [string]$_ } | Where-Object { $_ -match '^\d+$' } | Select-Object -First 1500)
             if ($script:Halted -or -not $ids.Count) { Reply $Msg.id 'false'; return }

@@ -45,6 +45,8 @@ function dataTab() {
   const s = S.state.settings;
   return [
     ratingsPanel(),
+    hr(),
+    salaryPanel(),
     h('p', null, h('label', null, h('input', { type: 'checkbox', checked: s.showForm !== false ? true : null, onchange: (e) => S.saveSettings({ showForm: e.target.checked }) }),
       ' Show the Form rating (DARKO-style) on Leaderboards and player pages')),
     hr(),
@@ -165,6 +167,30 @@ function timingPanel() {
   return box;
 }
 
+
+// Salaries for the Best / Worst Value cards: one ESPN request per player, only when pressed.
+function salaryPanel() {
+  const box = h('div', { class: 'rate-panel' });
+  const paint = () => {
+    const sal = S.state.salaries, J = S.state.salaryJob;
+    const known = sal ? Object.values(sal.players || {}).filter((v) => v && v.salary > 0).length : 0;
+    const none = sal ? Object.values(sal.players || {}).filter((v) => v === null).length : 0;
+    const status = J && J.running ? `Loading salaries… ${J.n} of ${J.total} players (${J.found} found).`
+      : sal && sal.fetchedAt ? `${known} salaries loaded ${String(sal.fetchedAt).slice(0, 10)}${none ? `; ESPN has no contract this season for ${none} (shown without a value)` : ''}.`
+      : 'Not loaded yet.';
+    box.replaceChildren(
+      h('p', { style: { marginBottom: '6px' } }, h('b', null, 'Salaries '), h('small', null, 'For the Best Value and Worst Value cards on Leaderboards. From ESPN’s contracts data: one request per rostered player (about 500, one per second, roughly 9 minutes), favourite teams first. Saved for the season.')),
+      h('p', null, h('small', null, status), ' ',
+        h('button', { class: 'btn', type: 'button', disabled: (J && J.running) || S.state.halted ? true : null,
+          onclick: () => S.fetchSalaries({ onlyMissing: false }).catch((e) => { S.state.salaryJob = { running: false, error: e.message }; paint(); }) }, sal && sal.fetchedAt ? 'Reload all salaries' : 'Load salaries from ESPN'),
+        sal && sal.fetchedAt ? [' ', h('button', { class: 'btn', type: 'button', disabled: (J && J.running) || S.state.halted ? true : null, title: 'Only players with no saved answer yet (new signings, trades)',
+          onclick: () => S.fetchSalaries({ onlyMissing: true }).catch(() => {}) }, 'Load new players only')] : null));
+  };
+  S.loadSalaries().then(paint);
+  paint();
+  const unsub = S.subscribe((t) => { if (!box.isConnected) { unsub(); return; } if (t.has('salaries')) paint(); });
+  return box;
+}
 
 // Which possession formula the team ratings (ORtg, DRtg, Net) use.
 function ratingsPanel() {

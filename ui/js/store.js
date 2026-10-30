@@ -570,6 +570,25 @@ export async function loadSeason(abbr, force) {
 }
 
 // League-wide season totals, kept in cache\league-stats.json and topped up one new saved box score at a time.
+// Salaries (ESPN contracts data), fetched only when the person presses the button. cache\salaries.json:
+// { season, fetchedAt, players: { id: { salary, years, option } | null } } (null = ESPN has no contract this season)
+export async function loadSalaries(force) {
+  if (state.salaries && !force) return state.salaries;
+  const f = await readCache('salaries.json');
+  state.salaries = f && f.players ? f : { season: 0, fetchedAt: '', players: {} };
+  notify('salaries', 'league');
+  return state.salaries;
+}
+export async function fetchSalaries({ onlyMissing = false } = {}) {
+  const files = await Promise.all(state.teams.map((t) => loadTeamFile(t.abbr)));
+  const fav = favSet(), have = (state.salaries && state.salaries.players) || {};
+  const ids = [];
+  const order = state.teams.map((t, i) => [t, files[i]]).sort((a, b) => (fav.has(b[0].abbr) ? 1 : 0) - (fav.has(a[0].abbr) ? 1 : 0));
+  for (const [, f] of order) for (const p of (f ? f.players : [])) { const id = String(p.id); if (!ids.includes(id) && (!onlyMissing || !(id in have))) ids.push(id); }
+  if (!ids.length) return false;
+  state.salaryJob = { running: true, n: 0, total: ids.length, found: 0, missing: 0, failed: 0 }; notify('salaries');
+  return bridge.request('salaries.fetch', { ids });
+}
 // NBA.com ratings: fetch older saved box scores again so they gain on-court counts, then rebuild league stats locally.
 export async function recountOnCourt() {
   const ids = (state.league.data && state.league.data.noOc) || [];
@@ -651,6 +670,7 @@ export async function init() {
   bridge.on('host.visible', () => { if (state.settings.autoRefresh && !state.halted) bridge.request('live.refresh').catch(() => {}); notify('visible'); });
   bridge.on('host.hidden', () => notify('hidden'));
   bridge.on('traffic', (d) => { state.halted = !!(d && d.stopped); notify('traffic'); });
+  bridge.on('salaries', (d) => { state.salaryJob = d; notify('salaries'); if (d && (!d.running || d.n % 50 === 0)) loadSalaries(true); });
   bridge.on('recount', (d) => { state.recount = d; notify('recount'); if (d && !d.running) rebuildLeague(); });
   bridge.on('txhistory', (d) => { state.txh = d; notify('fa'); if (d && !d.running) loadEspnTx(true); });
 

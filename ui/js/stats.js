@@ -176,6 +176,32 @@ const pct = (m, a) => (a > 0 ? (100 * m) / a : NaN);
 
 // minGames-scaled qualification keeps tiny samples out early in the season
 // NBA.com statistical minimums, scaled to team games played: 300 FG / 125 FT / 82 3P made and 70% of games over 82 games.
+// Contract value (surplus): Win Shares valued at the league's going rate per win, minus salary earned so far.
+// Rate = salary earned so far by every player with a known salary / their Win Shares, so the league total comes out near zero.
+export function valueCtx(lg, salaries, L) {
+  const pay = salaries && salaries.players;
+  if (!pay || !L) return null;
+  let paid = 0, ws = 0, n = 0;
+  for (const p of Object.values(lg.players || {})) {
+    const s = pay[p.id], t = lg.teams[p.team];
+    if (!s || !(s.salary > 0) || !t) continue;
+    const w = winShares(p.tot, t.T, t.O, t.games, L);
+    if (!w) continue;
+    paid += s.salary * Math.min(1, t.games / 82); ws += w.ws; n++;
+  }
+  return n >= 30 && ws > 0 ? { perWin: paid / ws, pay } : null;
+}
+export function playerValue(p, a) {
+  if (!a.V || !a.L) return null;
+  const s = a.V.pay[p.id];
+  if (!s || !(s.salary > 0)) return null;
+  const w = winShares(p.tot, a.T, a.O, a.games, a.L);
+  if (!w) return null;
+  const earned = s.salary * Math.min(1, a.games / 82);
+  return { surplus: w.ws * a.V.perWin - earned, salary: s.salary, ws: w.ws };
+}
+const isStarter = (p) => p.gs * 2 >= p.gp;
+const money = (v) => `${v < 0 ? '\u2212' : ''}$${(Math.abs(v) / 1e6).toFixed(1)}M`;
 export const NBA_MIN = { gpShare: 0.7, fg: 300 / 82, ft: 125 / 82, tp: 82 / 82 };
 export const nbaMin = (k, games) => Math.ceil(NBA_MIN[k] * games - 1e-9);
 export const LEADER_DEFS = [
@@ -205,6 +231,9 @@ export const LEADER_DEFS = [
   { key: 'tov', loser: 'Most Turnovers', title: 'Turnovers', unit: 'TOV per game', v: (p) => per(p, 'tov'), f: 1, low: true, loserOnly: true },
   { key: 'pf', loser: 'Most Fouls', title: 'Fouls', unit: 'PF per game', v: (p) => per(p, 'pf'), f: 1, low: true, loserOnly: true },
   { key: 'min', title: 'Minutes', unit: 'MPG', v: (p) => per(p, 'min'), f: 1 },
+  { key: 'value', title: 'Best Value', loser: 'Worst Value', unit: 'surplus over salary', v: (p, a) => { const x = playerValue(p, a); return x ? x.surplus / 1e6 : NaN; }, f: 1, needsLeague: true, noEdge: true,
+    ok: (p) => isStarter(p) || p.tot.min / p.gp >= 20, okWorst: (p) => isStarter(p),
+    text: (p, a, v) => `${v > 0 ? '+' : ''}${money(v * 1e6)}`, sub: (p, a) => { const x = playerValue(p, a); return `${x ? money(x.salary) : ''} salary \u00b7 ${p.gp} GP`; } },
   { key: 'ws', title: 'Win Shares', unit: 'wins produced', v: (p, a) => wsOf(p, a)?.ws, f: 1, needsLeague: true, noEdge: true,
     sub: (p) => `${p.gp} GP` },
   { key: 'ws48', title: 'Win Shares per 48', loser: 'Lowest Win Shares per 48', unit: 'WS/48 (avg \u2248 .100)', v: (p, a) => wsOf(p, a)?.per48, f: 3, needsLeague: true, ok: (p, a) => p.tot.min >= 10 * a.games,
@@ -225,7 +254,8 @@ export function gpAdjust(rows, valueOf, gamesOf, k = GP_WEIGHT) {
 
 export function rankAll(players, ctxFor, top, { minMpg = 8, minGpShare = 0, worst = false, gpWeight = 0, league = false, form = false, official = false, method = 'native' } = {}) {
   const base = ctxFor; ctxFor = (p) => { const c = base(p); return c ? { ...c, method } : c; };
-  return LEADER_DEFS.filter((d) => (worst ? d.loser : !d.loserOnly) && (!d.leagueOnly || (league && form)) && (!d.needsLeague || league)).map((d) => {
+  const anyCtx = players.map(base).find(Boolean); const hasValue = !!(anyCtx && anyCtx.V);
+  return LEADER_DEFS.filter((d) => (worst ? d.loser : !d.loserOnly) && (!d.leagueOnly || (league && form)) && (!d.needsLeague || league) && (d.key !== 'value' || hasValue)).map((d) => {
     const rows = players
       .filter((p) => {
         const c = ctxFor(p);
@@ -238,7 +268,7 @@ export function rankAll(players, ctxFor, top, { minMpg = 8, minGpShare = 0, wors
     return { key: d.key, title: worst ? d.loser : d.title, unit: d.unit, f: d.f, suffix: d.suffix || '', signed: !!d.signed, note: (typeof d.note === 'function' ? d.note({ method }) : d.note) || '', rows: rows
       .sort((a, b) => ((!!d.low !== worst) ? a.rank - b.rank : b.rank - a.rank) || b.p.tot.min - a.p.tot.min)   // ties: the player with more minutes ranks first
       .slice(0, top)
-      .map((r) => ({ id: r.p.id, name: r.p.name, team: r.p.team, jersey: r.p.jersey, value: r.value, text: d.text ? d.text(r.p) : '', sub: d.sub ? d.sub(r.p) : `${r.p.gp} GP` })) };
+      .map((r) => ({ id: r.p.id, name: r.p.name, team: r.p.team, jersey: r.p.jersey, value: r.value, text: d.text ? d.text(r.p, ctxFor(r.p), r.value) : '', sub: d.sub ? d.sub(r.p, ctxFor(r.p)) : `${r.p.gp} GP` })) };
   });
 }
 
@@ -310,16 +340,16 @@ export function leagueAdd(lg, box) {
 }
 
 // League leaders: stricter than the team view (10+ minutes a game, and at least half of the team's games played).
-export function leagueLeaders(lg, top = 5, { form = true, method = 'native' } = {}) {
+export function leagueLeaders(lg, top = 5, { form = true, method = 'native', salaries = null } = {}) {
   if (form) applyForm(lg);
-  const L = leagueCtx(lg);
-  return rankAll(Object.values(lg.players), (p) => (lg.teams[p.team] ? { games: lg.teams[p.team].games, T: lg.teams[p.team].T, O: lg.teams[p.team].O, L } : null), top, { minMpg: 0, minGpShare: NBA_MIN.gpShare, gpWeight: GP_WEIGHT, league: true, form, official: true, method });
+  const L = leagueCtx(lg), V = valueCtx(lg, salaries, L);
+  return rankAll(Object.values(lg.players), (p) => (lg.teams[p.team] ? { games: lg.teams[p.team].games, T: lg.teams[p.team].T, O: lg.teams[p.team].O, L, V } : null), top, { minMpg: 0, minGpShare: NBA_MIN.gpShare, gpWeight: GP_WEIGHT, league: true, form, official: true, method });
 }
 
-export function leagueLosers(lg, top = 5, { form = true, method = 'native' } = {}) {
+export function leagueLosers(lg, top = 5, { form = true, method = 'native', salaries = null } = {}) {
   if (form) applyForm(lg);
-  const L = leagueCtx(lg);
-  return rankAll(Object.values(lg.players), (p) => (lg.teams[p.team] ? { games: lg.teams[p.team].games, T: lg.teams[p.team].T, O: lg.teams[p.team].O, L } : null), top, { minMpg: 10, minGpShare: 0.5, worst: true, gpWeight: GP_WEIGHT, league: true, form, method });
+  const L = leagueCtx(lg), V = valueCtx(lg, salaries, L);
+  return rankAll(Object.values(lg.players), (p) => (lg.teams[p.team] ? { games: lg.teams[p.team].games, T: lg.teams[p.team].T, O: lg.teams[p.team].O, L, V } : null), top, { minMpg: 10, minGpShare: 0.5, worst: true, gpWeight: GP_WEIGHT, league: true, form, method });
 }
 
 export function fmtValue(v, card) {
