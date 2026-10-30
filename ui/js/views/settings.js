@@ -177,7 +177,7 @@ function ratingsPanel() {
         type: 'button', role: 'radio', 'aria-checked': cur === k ? 'true' : 'false', class: cur === k ? 'active' : '',
         onclick: () => { S.saveSettings({ ratingMethod: k }); paint(); } }, label))),
       h('p', null, h('small', null, METHOD_NOTES[cur])),
-      cur === 'nba' ? onCourtBox() : null);
+      cur === 'nba' ? onCourtBox() : '');
   };
   // NBA.com player ratings need on-court counts; box scores saved before v0.18 don't have them.
   const onCourtBox = () => {

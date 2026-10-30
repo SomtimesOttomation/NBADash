@@ -47,7 +47,7 @@ export function eastWestReport() {
   const head = h('div', { class: 'section-head' }, h('h2', null, 'East-West Report', h('small', null, 'How the conferences compare')));
   if (!st || !lg || !Object.keys(lg.teams || {}).length) return h('section', { class: 'ewr' }, head, h('p', { class: 'muted' }, S.state.league.loading ? 'Building league stats…' : 'Needs saved box scores. Run Update everything in Settings > Data.'));
   const r = eastWest(lg, st, S.state.settings.ratingMethod || 'native');
-  if (!r) return null;
+  if (!r) return '';
   const { h2h } = r;
   const share = h2h.games ? h2h.w / h2h.games : 0.5;
   const bar = h('div', { class: 'ewr-bar', role: 'img', 'aria-label': `East ${h2h.w}, West ${h2h.l} in games between the conferences` },
