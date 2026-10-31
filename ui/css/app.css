@@ -518,3 +518,7 @@ a.plink:hover { color: var(--accent2); }
 .sw { color: var(--muted); font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .sw.live { color: var(--text); }
 .sw-up { color: #1f9d55; font-weight: 700; } .sw-dn { color: #cc3b3b; font-weight: 700; } .sw-eq { color: var(--muted); }
+
+/* players of the week: East and West side by side */
+.pow.pow-split { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 760px) { .pow.pow-split { grid-template-columns: 1fr; } }

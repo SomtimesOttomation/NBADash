@@ -9,6 +9,7 @@ let week = 0;
 export function mount(ctx) {
   week = Math.max(1, parseInt(ctx.arg, 10) || 1);
   Promise.all(S.weekDayKeys(week).map((k) => S.loadDay(k))).then(() => loadWeekBoxes(ctx));
+  S.loadStandings().then(() => draw(ctx));
   draw(ctx);
 }
 
@@ -26,7 +27,7 @@ async function loadWeekBoxes(ctx) {
 // Best: highest Game Score per game. Worst is kept fair: only rotation players (20+ minutes a game, and at least
 // 2 games or every game their team played that week), so end-of-bench and garbage-time minutes never count.
 export const POW = { minMpg: 20, minGames: 2, garbageMin: 8 };
-function playersOfWeek(boxes) {
+function playersOfWeek(boxes, only) {
   const P = new Map(), teamGames = new Map();
   for (const b of boxes) for (const t of b.teams) {
     teamGames.set(t.team, (teamGames.get(t.team) || 0) + 1);
@@ -39,7 +40,7 @@ function playersOfWeek(boxes) {
       P.set(p.id, e);
     }
   }
-  const all = [...P.values()].map((e) => ({ ...e, v: e.gs / e.gp, mpg: e.min / e.gp }));
+  const all = [...P.values()].filter((e) => !only || only.has(e.team)).map((e) => ({ ...e, v: e.gs / e.gp, mpg: e.min / e.gp }));
   const rotation = all.filter((e) => e.mpg >= POW.minMpg && e.gp >= Math.min(POW.minGames, teamGames.get(e.team) || 1));
   const best = rotation.slice().sort((a, b) => b.v - a.v || b.min - a.min).slice(0, 3);
   const worst = rotation.filter((e) => !best.includes(e)).sort((a, b) => a.v - b.v || b.min - a.min).slice(0, 3);
@@ -56,7 +57,7 @@ function powCard(title, list, worst) {
       h('span', { class: 'val' }, e.v.toFixed(1)))))
       : h('p', { class: 'muted pad' }, worst ? 'Not enough rotation players yet' : 'No finished games yet'));
 }
-export function update(topics, ctx) { if (['days', 'favorites', 'watch', 'teams', 'box'].some((t) => topics.has(t))) draw(ctx); }
+export function update(topics, ctx) { if (['days', 'favorites', 'watch', 'teams', 'box', 'standings'].some((t) => topics.has(t))) draw(ctx); }
 
 function draw({ el }) {
   const keys = S.weekDayKeys(week).slice().reverse().filter((k) => S.state.cachedDayKeys.includes(k) || S.state.days.has(k));
@@ -71,8 +72,20 @@ function draw({ el }) {
     out.push(sectionHead(fmtKey(k), `${events.length} game${events.length === 1 ? '' : 's'}`), h('div', { class: 'grid' }, events.map((e) => gameCard(e))));
   }
   if (weekBoxes.week === week && weekBoxes.boxes.length) {
-    const r = playersOfWeek(weekBoxes.boxes);
-    out.splice(1, 0, h('div', { class: 'pow' }, powCard('Best of the week', r.best, false), powCard('Worst of the week', r.worst, true)),
+    // split by conference when the standings are cached; league-wide otherwise
+    const confs = (S.state.standings && S.state.standings.conferences) || [];
+    const east = confs.find((c) => /east/i.test(c.name || '')), west = confs.find((c) => c !== east);
+    let cards;
+    if (east && west) {
+      const set = (c) => new Set(c.teams.map((t) => t.abbr));
+      const E = playersOfWeek(weekBoxes.boxes, set(east)), W = playersOfWeek(weekBoxes.boxes, set(west));
+      cards = [powCard('East \u00b7 Best of the week', E.best, false), powCard('West \u00b7 Best of the week', W.best, false),
+        powCard('East \u00b7 Worst of the week', E.worst, true), powCard('West \u00b7 Worst of the week', W.worst, true)];
+    } else {
+      const r = playersOfWeek(weekBoxes.boxes);
+      cards = [powCard('Best of the week', r.best, false), powCard('Worst of the week', r.worst, true)];
+    }
+    out.splice(1, 0, h('div', { class: 'pow pow-split' }, cards),
       h('p', { class: 'muted pow-note' }, `From ${weekBoxes.boxes.length} saved box score${weekBoxes.boxes.length === 1 ? '' : 's'}. Worst only counts rotation players: 20+ minutes a game and at least 2 games (or every game their team played), and games under 8 minutes are ignored.`));
   }
   if (!games) out.push(emptyState('No games saved for this week', 'Use "Fill in season history" in settings to download them.'));
