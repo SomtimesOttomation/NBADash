@@ -26,7 +26,7 @@ export const state = {
   teams: [],
   byAbbr: new Map(),
   byId: new Map(),
-  settings: { favorites: [], theme: 'system', liveSeconds: 30, autoWatch: true, updateCheck: true, autoHistory: true, autoRefresh: false, ratingMethod: 'native', showForm: true, ...TUNE_DEFAULTS },
+  settings: { favorites: [], theme: 'system', liveSeconds: 30, autoWatch: true, updateCheck: true, autoHistory: true, autoRefresh: false, ratingMethod: 'native', showForm: true, showSwings: false, ...TUNE_DEFAULTS },
   days: new Map(),          // 'yyyymmdd' -> { key, events, allFinal, source, at }
   cachedDayKeys: [],
   teamFiles: new Map(),     // abbr -> file | null

@@ -49,6 +49,8 @@ function dataTab() {
     salaryPanel(),
     h('p', null, h('label', null, h('input', { type: 'checkbox', checked: s.showForm !== false ? true : null, onchange: (e) => S.saveSettings({ showForm: e.target.checked }) }),
       ' Show the Form rating (DARKO-style) on Leaderboards and player pages')),
+    h('p', null, h('label', null, h('input', { type: 'checkbox', checked: s.showSwings ? true : null, onchange: (e) => S.saveSettings({ showSwings: e.target.checked }) }),
+      ' Show win / loss moves in Standings (where each team playing today would move with a win or a loss)')),
     hr(),
     h('p', null, h('b', null, 'Data cache '), h('small', null, S.state.cacheDir || '(dev preview)')),
     syncPanel(),
