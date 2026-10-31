@@ -5,7 +5,7 @@ import { teamLogo, sectionHead, emptyState } from '../components.js';
 import { eastWestReport } from './eastwest.js';
 
 export function mount(ctx) { S.loadStandings().then(() => draw(ctx)); S.loadDay(S.todayKey()).then(() => draw(ctx)); S.loadLeague().then(() => draw(ctx)); draw(ctx); }
-export function update(topics, ctx) { if (topics.has('standings') || topics.has('favorites') || topics.has('days') || topics.has('live') || topics.has('league') || topics.has('settings')) draw(ctx); }
+export function update(topics, ctx) { if (topics.has('standings') || topics.has('favorites') || topics.has('days') || topics.has('live') || topics.has('settings') || topics.has('league') || topics.has('settings')) draw(ctx); }
 
 const COLS = [['W', 'wins'], ['L', 'losses'], ['PCT', 'winPercent'], ['GB', 'gamesBehind'], ['HOME', 'Home'], ['AWAY', 'Road'], ['L10', 'Last Ten Games'], ['STRK', 'streak']];
 const pick = (stats, key) => {
@@ -61,7 +61,7 @@ function draw({ el }) {
   const wrap = h('div', { class: 'two' });
   for (const c of st.conferences) {
     const teams = sortStandings(c.teams);
-    const sw = swings(c);
+    const sw = S.state.settings.showSwings ? swings(c) : new Map();
     wrap.append(h('div', null, sectionHead(c.name),
       h('div', { class: 'card scroll-x' }, h('table', { class: 'tbl' },
         h('thead', null, h('tr', null, h('th', null, 'Team'), COLS.map(([l]) => h('th', null, l)))),

@@ -195,12 +195,12 @@ function Initialize-Dash {
     $settingsDir = Split-Path $SettingsPath
     if (-not (Test-Path $settingsDir)) { New-Item -ItemType Directory -Path $settingsDir -Force | Out-Null }
 
-    $script:Settings = [pscustomobject]@{ favorites = @(); theme = 'system'; liveSeconds = 30; autoWatch = $true; updateCheck = $true; autoHistory = $true; autoRefresh = $false; ratingMethod = 'native'; showForm = $true }
+    $script:Settings = [pscustomobject]@{ favorites = @(); theme = 'system'; liveSeconds = 30; autoWatch = $true; updateCheck = $true; autoHistory = $true; autoRefresh = $false; ratingMethod = 'native'; showForm = $true; showSwings = $false }
     foreach ($k in $script:TuneDefaults.Keys) { $script:Settings | Add-Member -NotePropertyName $k -NotePropertyValue $script:TuneDefaults[$k][0] }
     if (Test-Path $SettingsPath) {
         try {
             $loaded = Get-Content $SettingsPath -Raw | ConvertFrom-Json
-            foreach ($k in (@('favorites', 'theme', 'liveSeconds', 'autoWatch', 'updateCheck', 'autoHistory', 'autoRefresh', 'ratingMethod', 'showForm') + @($script:TuneDefaults.Keys))) { if ($null -ne $loaded.$k) { $script:Settings.$k = $loaded.$k } }
+            foreach ($k in (@('favorites', 'theme', 'liveSeconds', 'autoWatch', 'updateCheck', 'autoHistory', 'autoRefresh', 'ratingMethod', 'showForm', 'showSwings') + @($script:TuneDefaults.Keys))) { if ($null -ne $loaded.$k) { $script:Settings.$k = $loaded.$k } }
         } catch { }
     }
 
@@ -305,6 +305,7 @@ function Invoke-PageCommand {
                 autoRefresh = [bool]$s.autoRefresh
                 ratingMethod = $(if (@('native', 'bref', 'nba') -contains [string]$s.ratingMethod) { [string]$s.ratingMethod } else { 'native' })
                 showForm = $(if ($null -eq $s.showForm) { $true } else { [bool]$s.showForm })
+                showSwings = [bool]$s.showSwings
             }
             foreach ($k in $script:TuneDefaults.Keys) {
                 $d = $script:TuneDefaults[$k]; $v = $d[0]
