@@ -10,6 +10,11 @@ _Nothing yet._
 
 ## Released
 
+### v0.20.0
+
+**Feature**
+- Standings show where each team playing today would move with a win or a loss.
+
 ### v0.19.0
 
 **Feature**
