@@ -10,6 +10,11 @@ _Nothing yet._
 
 ## Released
 
+### v0.20.1
+
+**Redesign**
+- Standings win / loss moves are now off by default; turn them on in Settings > Data.
+
 ### v0.20.0
 
 **Feature**
