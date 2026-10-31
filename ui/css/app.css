@@ -513,3 +513,8 @@ a.plink:hover { color: var(--accent2); }
 .ewr-seed > .ewr-team:last-child { justify-self: end; flex-direction: row-reverse; }
 .ewr-team.better { background: var(--surface2); box-shadow: inset 3px 0 0 var(--accent); }
 .ewr-seed > .ewr-team:last-child.better { box-shadow: inset -3px 0 0 var(--accent); }
+
+/* standings: rank change with a win / loss today */
+.sw { color: var(--muted); font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sw.live { color: var(--text); }
+.sw-up { color: #1f9d55; font-weight: 700; } .sw-dn { color: #cc3b3b; font-weight: 700; } .sw-eq { color: var(--muted); }
