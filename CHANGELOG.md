@@ -10,6 +10,11 @@ _Nothing yet._
 
 ## Released
 
+### v0.20.2
+
+**Redesign**
+- Best and worst of the week are split into East and West.
+
 ### v0.20.1
 
 **Redesign**
