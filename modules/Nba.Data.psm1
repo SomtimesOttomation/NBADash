@@ -549,6 +549,27 @@ function Invoke-NbaWorker {
                     if ($all.Count -gt 0) { Save-NbaJsonFile (Join-Path $cache 'espn-transactions.json') ([pscustomobject]@{ fetchedAt = (Get-Date).ToString('s'); complete = $ok; entries = $all.ToArray() }) }
                     Push-NbaEvent $Shared 'txhistory' @{ running = $false; ok = ($ok -and $all.Count -gt 0); count = $all.Count; error = $(if ($ok) { '' } else { [string]$Shared.LastError }) }
                 }
+                elseif ($cmd.type -eq 'drafts' -and $cmd.ids) {
+                    # Draft slot per player (ESPN's displayDraft, e.g. "2026: Rd 1, Pk 3 (TOR)"), one request per player,
+                    # one per second, only when the person presses the button. Saved to cache\drafts.json; '' = undrafted.
+                    $path = Join-Path $cache 'drafts.json'
+                    $have = @{}
+                    try { $old = [IO.File]::ReadAllText($path) | ConvertFrom-Json; foreach ($pp in $old.players.PSObject.Properties) { $have[$pp.Name] = $pp.Value } } catch { }
+                    $list = @($cmd.ids); $n = 0; $okN = 0
+                    foreach ($cid in $list) {
+                        if ($Shared.Stop -or $Shared.Halted) { break }
+                        $n++
+                        $ath = Get-NbaJson -Shared $Shared -Url ("{0}/sports/basketball/nba/athletes/{1}" -f $Shared.EspnCommonBase, $cid) -Kind 'player'
+                        if ($ath -and $ath.athlete) { $have[[string]$cid] = [string]$ath.athlete.displayDraft; $okN++ }
+                        if ($n % 10 -eq 0 -or $n -eq $list.Count) {
+                            Save-NbaJsonFile $path ([pscustomobject]@{ fetchedAt = (Get-Date).ToString('s'); players = [pscustomobject]$have })
+                            Push-NbaEvent $Shared 'drafts' @{ running = $true; n = $n; total = $list.Count; ok = $okN }
+                        }
+                        if ($n -lt $list.Count) { Start-Sleep -Milliseconds 1000 }
+                    }
+                    Save-NbaJsonFile $path ([pscustomobject]@{ fetchedAt = (Get-Date).ToString('s'); players = [pscustomobject]$have })
+                    Push-NbaEvent $Shared 'drafts' @{ running = $false; n = $n; total = $list.Count; ok = $okN }
+                }
                 elseif ($cmd.type -eq 'salaries' -and $cmd.ids) {
                     # This season's salary per player from ESPN's contracts data, one request per player, one per second,
                     # only when the person presses the button. Saved to cache\salaries.json; a 404 means ESPN has no
