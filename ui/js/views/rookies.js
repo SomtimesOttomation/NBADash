@@ -34,11 +34,12 @@ async function loadRookies() {
 
 export function mount(ctx) {
   Promise.all([S.loadLeague(), loadRookies()]).then(() => draw(ctx));
+  S.loadDrafts().then(() => draw(ctx));
   draw(ctx);
 }
 export function update(topics, ctx) {
   if (topics.has('teamfile')) { rookieIds = null; memo.rev = -1; loadRookies().then(() => draw(ctx)); return; }
-  if (topics.has('league') || topics.has('settings')) draw(ctx);
+  if (topics.has('league') || topics.has('settings') || topics.has('drafts')) draw(ctx);
 }
 
 const pct = (vals) => { const s = [...vals].sort((a, b) => a - b); return (v) => (s.length < 2 ? 50 : (100 * s.filter((x) => x < v).length + 50 * (s.filter((x) => x === v).length - 1)) / (s.length - 1)); };
@@ -83,7 +84,17 @@ export function rookieRows(lg, rookies, { form = true } = {}) {
 
 const f1 = (v) => (Number.isFinite(v) ? v.toFixed(1) : '–');
 const sg = (v) => (Number.isFinite(v) ? (v > 0 ? '+' : '') + v.toFixed(1) : '–');
+// "2026: Rd 1, Pk 3 (TOR)" -> { text: 'R1 #3', team: 'TOR', order: 3 } ; '' -> Undrafted
+export function parseDraft(s) {
+  if (s == null) return null;
+  const m = /Rd\s*(\d+),\s*Pk\s*(\d+)(?:\s*\(([^)]+)\))?/i.exec(String(s));
+  if (!m) return { text: 'Undrafted', team: '', order: 999 };
+  const rd = +m[1], pk = +m[2];
+  return { text: `R${rd} #${pk}`, team: m[3] || '', order: rd === 1 ? pk : 30 + pk };
+}
+const draftOf = (r) => parseDraft(S.state.drafts && S.state.drafts.players ? S.state.drafts.players[r.id] : null);
 const COLS = [
+  ['draft', 'Drafted', '', (r) => { const d = draftOf(r); return d ? h('span', { title: d.team ? `Drafted by ${d.team}` : 'Not drafted' }, d.text, d.team ? h('small', { class: 'muted' }, ` ${d.team}`) : null) : '\u2013'; }, (r) => { const d = draftOf(r); return d ? -d.order : -1000; }],
   ['score', 'Score', 'rookie', (r) => (r.rank ? Math.round(r.rscore) : '–'), (r) => r.rscore ?? -1],
   ['gp', 'GP', '', (r) => r.gp, (r) => r.gp],
   ['mpg', 'MIN', '', (r) => f1(r.mpg), (r) => r.mpg],
@@ -147,7 +158,14 @@ function draw(ctx) {
       `${rookieIds.size} rookies on rosters. Ranked by `, h('span', calc('rookie', 'player'), 'Rookie score'),
       ` (0–100, against the other rookies). To be ranked a rookie needs ${ROOKIE_MIN.mpg}+ minutes a game and a quarter of his team’s games; the rest are listed below, greyed out.`,
       unplayed > 0 ? ` ${unplayed} have not played yet.` : '', ' Click a column to sort.');
-    body = h('div', null, note,
+    // draft slots: one ESPN request per rookie not looked up yet, only when pressed
+    const known = (S.state.drafts && S.state.drafts.players) || {}, J = S.state.draftJob;
+    const need = [...rookieIds.keys()].filter((id) => !(id in known));
+    const draftBar = J && J.running ? h('p', { class: 'muted' }, `Loading draft info\u2026 ${J.n} of ${J.total}.`)
+      : need.length ? h('p', { class: 'muted' }, `Draft info missing for ${need.length} rookie${need.length === 1 ? '' : 's'}. `,
+        h('button', { class: 'btn', type: 'button', disabled: S.state.halted ? true : null, title: 'One ESPN request per rookie, one per second',
+          onclick: () => S.fetchDrafts(need).catch(() => {}) }, `Load draft info (${need.length} request${need.length === 1 ? '' : 's'})`)) : null;
+    body = h('div', null, note, draftBar,
       ranked.length && sortKey === 'score' ? podium(ranked.slice(0, 3)) : null,
       ranked.length || rest.length ? table([...ranked, ...rest], form) : emptyState('No rookie has played yet', ''));
   }

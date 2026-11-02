@@ -570,6 +570,19 @@ export async function loadSeason(abbr, force) {
 }
 
 // League-wide season totals, kept in cache\league-stats.json and topped up one new saved box score at a time.
+// Draft slots (ESPN player bio), fetched only when the person presses the button. cache\drafts.json: { players: { id: displayDraft } }
+export async function loadDrafts(force) {
+  if (state.drafts && !force) return state.drafts;
+  const f = await readCache('drafts.json');
+  state.drafts = f && f.players ? f : { fetchedAt: '', players: {} };
+  notify('drafts');
+  return state.drafts;
+}
+export async function fetchDrafts(ids) {
+  if (!ids.length) return false;
+  state.draftJob = { running: true, n: 0, total: ids.length, ok: 0 }; notify('drafts');
+  return bridge.request('drafts.fetch', { ids });
+}
 // Salaries (ESPN contracts data), fetched only when the person presses the button. cache\salaries.json:
 // { season, fetchedAt, players: { id: { salary, years, option } | null } } (null = ESPN has no contract this season)
 export async function loadSalaries(force) {
@@ -670,6 +683,7 @@ export async function init() {
   bridge.on('host.visible', () => { if (state.settings.autoRefresh && !state.halted) bridge.request('live.refresh').catch(() => {}); notify('visible'); });
   bridge.on('host.hidden', () => notify('hidden'));
   bridge.on('traffic', (d) => { state.halted = !!(d && d.stopped); notify('traffic'); });
+  bridge.on('drafts', (d) => { state.draftJob = d; notify('drafts'); if (d && (!d.running || d.n % 20 === 0)) loadDrafts(true); });
   bridge.on('salaries', (d) => { state.salaryJob = d; notify('salaries'); if (d && (!d.running || d.n % 50 === 0)) loadSalaries(true); });
   bridge.on('recount', (d) => { state.recount = d; notify('recount'); if (d && !d.running) rebuildLeague(); });
   bridge.on('txhistory', (d) => { state.txh = d; notify('fa'); if (d && !d.running) loadEspnTx(true); });
