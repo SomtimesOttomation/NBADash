@@ -10,6 +10,11 @@ _Nothing yet._
 
 ## Released
 
+### v0.21.0
+
+**Feature**
+- Drafted column on Rookie Watch (load draft info with one click).
+
 ### v0.20.2
 
 **Redesign**
