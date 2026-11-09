@@ -6,13 +6,17 @@ Release rhythm: changes are merged as they are done without changing VERSION, an
 
 ## Unreleased
 
+_Nothing yet._
+
+## Released
+
+### v0.21.1
+
 **Bug/Fix**
 - Search suggestion text lines up with the typed text in the navigation bar.
 
 **Housekeeping**
 - Navigation bar spec: docking rules, halt bar and sync bar styles, ghost text padding.
-
-## Released
 
 ### v0.21.0
 
