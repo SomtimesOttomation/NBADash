@@ -434,7 +434,9 @@ a.plink:hover { color: var(--accent2); }
 .np-sep { width: 1px; height: 20px; background: var(--line); margin: 0 6px 0 4px; }
 .navpill .psearch, .navpill .psearch input { margin: 0; background: transparent; }
 .navpill .psearch input { width: min(483px, 62vw) !important; border: 0; border-radius: 999px; padding: 8px 14px; }
-.navpill .psearch input:focus { outline: none; background: var(--surface2); }
+/* the focus background goes on the wrapper: the suggestion (ghost) text sits behind the input, so an input background would hide it */
+.navpill .psearch input:focus { outline: none; }
+.navpill .psearch:focus-within { background: var(--surface2); border-radius: 4px; }
 .navpill .psearch-ghost { padding: 9px 14px; }
 .navpill .psearch-results { left: 50%; transform: translateX(-50%); }
 .pow { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; margin-bottom: 4px; }
