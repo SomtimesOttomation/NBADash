@@ -435,7 +435,7 @@ a.plink:hover { color: var(--accent2); }
 .navpill .psearch, .navpill .psearch input { margin: 0; background: transparent; }
 .navpill .psearch input { width: min(483px, 62vw) !important; border: 0; border-radius: 999px; padding: 8px 14px; }
 .navpill .psearch input:focus { outline: none; background: var(--surface2); }
-.navpill .psearch-ghost { padding: 9px 15px; }
+.navpill .psearch-ghost { padding: 9px 14px; }
 .navpill .psearch-results { left: 50%; transform: translateX(-50%); }
 .pow { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; margin-bottom: 4px; }
 .pow-note { margin: 6px 0 14px; font-size: 12.5px; }
