@@ -10,6 +10,14 @@ _Nothing yet._
 
 ## Released
 
+### v0.21.2
+
+**Bug/Fix**
+- Search suggestion text is no longer hidden while you type in the navigation bar.
+
+**Housekeeping**
+- Navigation bar spec: ghost text font, focus background on the search wrapper.
+
 ### v0.21.1
 
 **Bug/Fix**
