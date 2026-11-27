@@ -1,6 +1,6 @@
 # Navigation bar spec (shared by all dashes)
 
-Reference implementation: NBADash v0.21.2 (`ui/index.html`, `ui/css/app.css`, `ui/js/app.js`); the Glass section is from the next NBADash release.
+Reference implementation: NBADash v0.22.0 (`ui/index.html`, `ui/css/app.css`, `ui/js/app.js`).
 Every dash that runs in DashLauncher (NBADash, F1Dash, FADash, ...) uses this bar so they look and behave the same.
 
 ## Layout
@@ -128,4 +128,4 @@ Body background is `transparent` (so `--bg: transparent` is enough if the body u
 - v0.13.1: refresh, live status and Settings moved from the top bar into the bar.
 - v0.15.0: live status is a button that pauses and resumes all data traffic; stronger blink while live; `Paused` state.
 - v0.21.0 (spec only, from NHLDash's docking): added page order and docking rules (no margin above the bar, hidden bars take no space); `#haltbar` and `#syncbar` styles; ghost completion padding `9px 14px` (NBADash had `9px 15px`, 1px off); ghost uses the input's font; the focus background goes on the wrapper, because an input background hid the suggestion (a bug in NBADash from v0.13.0 to v0.21.1).
-- Glass (DashLauncher 0.14.0 setting; NBADash next release): new Glass section for the opt-in Acrylic look. The navigation bar gets `--glass-strong` and the strong blur, nothing else about it changes.
+- v0.22.0: Glass (DashLauncher 0.14.0 setting): new Glass section for the opt-in Acrylic look. The navigation bar gets `--glass-strong` and the strong blur, nothing else about it changes.

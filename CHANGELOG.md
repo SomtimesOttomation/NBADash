@@ -10,6 +10,14 @@ _Nothing yet._
 
 ## Released
 
+### v0.22.0
+
+**Feature**
+- Glass look in DashLauncher 0.14.0+: when the launcher's Glass setting is on, the page background is transparent and cards, bars and the navigation bar are frosted over the blurred desktop. Text and team colours stay solid. Standalone is unchanged.
+
+**Housekeeping**
+- Navigation bar spec: new Glass section.
+
 ### v0.21.2
 
 **Bug/Fix**
