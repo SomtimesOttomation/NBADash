@@ -1,6 +1,6 @@
 # Navigation bar spec (shared by all dashes)
 
-Reference implementation: NBADash v0.21.0 (`ui/index.html`, `ui/css/app.css`, `ui/js/app.js`).
+Reference implementation: NBADash v0.21.2 (`ui/index.html`, `ui/css/app.css`, `ui/js/app.js`); the Glass section is from the next NBADash release.
 Every dash that runs in DashLauncher (NBADash, F1Dash, FADash, ...) uses this bar so they look and behave the same.
 
 ## Layout
@@ -90,9 +90,42 @@ Shows progress of a manual sync, if the dash has one. NBADash values, for dashes
 - **Settings**: opens the dash's Settings panel.
 - Keyboard focus and `aria-label`s on every button; the bar has `role="navigation" aria-label="Page navigation"`.
 
+## Glass
+
+Optional look for dashes that run in DashLauncher 0.14.0 or later with the person's **Glass** setting on (Windows 11 Acrylic). The launcher makes the dash's view transparent; the blurred desktop sits behind the page. Reference implementation: NBADash (`:root[data-glass]` block at the end of `ui/css/app.css`; `applyTheme()` in `ui/js/store.js`). A dash that ignores glass looks exactly as before.
+
+**Switch.** On `host.theme` (`{ theme, glass }`) set `<html data-glass="1">` when `glass` is true and remove the attribute when it is false or missing. Only in launcher mode: standalone never sets it. Everything below lives under `:root[data-glass]`, so removing the attribute restores the solid look.
+
+**Tokens** (re-declare under `:root[data-glass]`, and again for dark in the same two places the dash already switches dark: the `prefers-color-scheme` rule for `system` and `[data-theme="dark"]`):
+
+| Token | Light | Dark |
+|---|---|---|
+| `--bg` | `transparent` | `transparent` |
+| `--surface` (cards, bars, tiles) | `rgba(255,255,255,.62)` | `rgba(30,36,52,.62)` |
+| `--surface2` (hover, group rows) | `rgba(238,240,245,.55)` | `rgba(44,52,74,.55)` |
+| `--line` (borders) | `rgba(19,23,34,.12)` | `rgba(255,255,255,.12)` |
+| `--glass-strong` (nav bar, table headers) | `rgba(255,255,255,.82)` | `rgba(24,29,42,.82)` |
+| `--glass-pop` (pop-ups, modals, drop-downs) | `rgba(255,255,255,.94)` | `rgba(24,29,42,.94)` |
+| `--blur` / `--blur-strong` | `24px` / `40px` | same |
+
+Body background is `transparent` (so `--bg: transparent` is enough if the body uses it). Text colours, scores and team colours are **not** changed: they stay solid.
+
+**Frost.** `backdrop-filter: blur(var(--blur)) saturate(1.4)` (with the `-webkit-` prefix) on cards, game cards, top bar, banner, week bar, `#haltbar`, `#syncbar` and the banner tiles.
+
+**Navigation bar (the strongest frost).** `.navpill { background: var(--glass-strong); backdrop-filter: blur(var(--blur-strong)) saturate(1.4); }`. Everything else about the bar is unchanged: same size, square corners, 1px `var(--line)` border, flush under the week bar, buttons and separators as listed above. The `.navpill-row` behind it uses `--bg`, so it becomes transparent too (nothing there needs its own rule). Hover and the search focus look keep using `--surface2`, which stays translucent; the ghost text rule (input never has a background) is unaffected.
+
+**Readability rules.**
+- Tables get the strongest frost: sticky header cells use `--glass-strong` (a translucent header over scrolling rows is unreadable), and the table gets `backdrop-filter: blur(var(--blur-strong))`.
+- Pop-ups (search results, hover cards, modals, compare bar, scroll buttons) use `--glass-pop`, nearly opaque, with the strong blur.
+- Never reduce text contrast to make the glass show more; if a wallpaper makes text hard to read, raise the opacity of the surface, not the text.
+- Sticky or fixed elements need their own background; a transparent sticky element shows the content scrolling under it.
+
+**Testing.** In a browser, run the mock with a launcher preview and a busy page background behind the transparent page (NBADash: `?mock=1&launcher=1&glass=1`, add `&theme=light` for light). Check: the attribute appears only with glass; standalone and launcher-without-glass look unchanged; light and dark; table headers, search results and the nav bar readable over a striped background.
+
 ## Changes since first version
 
 - v0.13.0: bar added (back, forward, home, search); square corners; flush with the week bar; top border; 22px icons.
 - v0.13.1: refresh, live status and Settings moved from the top bar into the bar.
 - v0.15.0: live status is a button that pauses and resumes all data traffic; stronger blink while live; `Paused` state.
 - v0.21.0 (spec only, from NHLDash's docking): added page order and docking rules (no margin above the bar, hidden bars take no space); `#haltbar` and `#syncbar` styles; ghost completion padding `9px 14px` (NBADash had `9px 15px`, 1px off); ghost uses the input's font; the focus background goes on the wrapper, because an input background hid the suggestion (a bug in NBADash from v0.13.0 to v0.21.1).
+- Glass (DashLauncher 0.14.0 setting; NBADash next release): new Glass section for the opt-in Acrylic look. The navigation bar gets `--glass-strong` and the strong blur, nothing else about it changes.

@@ -335,6 +335,8 @@ export async function setWatch(id, on) {
 export const inLauncher = () => state.hostMode === 'launcher';
 export function applyTheme() {
   document.documentElement.dataset.theme = (inLauncher() && state.hostTheme) ? state.hostTheme : (state.settings.theme || 'system');
+  // Glass: only ever set by the launcher (Windows 11 Acrylic); standalone never sets it
+  if (inLauncher() && state.hostGlass) document.documentElement.dataset.glass = '1'; else delete document.documentElement.dataset.glass;
   notify('theme');
 }
 
@@ -679,7 +681,7 @@ export async function init() {
   applyTheme();
 
   // host events (dash contract): launcher theme, tab shown again, kill switch
-  bridge.on('host.theme', (d) => { state.hostTheme = (d && d.theme) || ''; applyTheme(); });
+  bridge.on('host.theme', (d) => { state.hostTheme = (d && d.theme) || ''; state.hostGlass = !!(d && d.glass); applyTheme(); });
   bridge.on('host.visible', () => { if (state.settings.autoRefresh && !state.halted) bridge.request('live.refresh').catch(() => {}); notify('visible'); });
   bridge.on('host.hidden', () => notify('hidden'));
   bridge.on('traffic', (d) => { state.halted = !!(d && d.stopped); notify('traffic'); });

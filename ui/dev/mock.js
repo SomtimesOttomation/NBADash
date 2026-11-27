@@ -144,6 +144,8 @@ export async function request(cmd, args) {
   switch (cmd) {
     case 'init': {
       const launcher = /[?&]launcher=1/.test(location.search);    // dev: preview the DashLauncher tab
+      // dev: add &glass=1 (and &theme=light) to preview Glass: the launcher sends host.theme once after load
+      if (launcher && /[?&]glass=1/.test(location.search)) setTimeout(() => emit('host.theme', { theme: /[?&]theme=light/.test(location.search) ? 'light' : 'dark', glass: true }), 200);
       return { settings, sync: { running: false, lastRun: new Date().toISOString() }, cacheDir: '(mock)', version: '0.2.0', sample: true,
         host: launcher ? { mode: 'launcher', theme: 'dark', launcherVersion: '0.1.0' } : { mode: 'standalone', theme: '' }, halted: false };
     }
