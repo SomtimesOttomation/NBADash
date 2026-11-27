@@ -524,3 +524,43 @@ a.plink:hover { color: var(--accent2); }
 /* players of the week: East and West side by side */
 .pow.pow-split { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (max-width: 760px) { .pow.pow-split { grid-template-columns: 1fr; } }
+
+/* Glass (DashLauncher 0.14.0+, opt-in, Windows 11 Acrylic): the launcher sends host.theme { theme, glass } and the page sets
+   <html data-glass="1"> while glass is true. The page background goes transparent so the blurred desktop shows through;
+   cards and bars turn translucent and frosted. Text, scores and team colours stay solid. Tables, the navigation bar and
+   pop-ups get the strongest frost so they stay readable over a busy wallpaper. Never set standalone (see docs/NAVBAR-SPEC.md, Glass). */
+:root[data-glass] {
+  --bg: transparent;
+  --surface: rgba(255, 255, 255, .62); --surface2: rgba(238, 240, 245, .55); --line: rgba(19, 23, 34, .12);
+  --glass-strong: rgba(255, 255, 255, .82); --glass-pop: rgba(255, 255, 255, .94);
+  --shadow: 0 1px 2px rgba(16, 24, 40, .08), 0 8px 24px rgba(16, 24, 40, .10);
+  --blur: 24px; --blur-strong: 40px;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-glass]:not([data-theme="light"]) {
+    --surface: rgba(30, 36, 52, .62); --surface2: rgba(44, 52, 74, .55); --line: rgba(255, 255, 255, .12);
+    --glass-strong: rgba(24, 29, 42, .82); --glass-pop: rgba(24, 29, 42, .94);
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
+  }
+}
+:root[data-glass][data-theme="dark"] {
+  --surface: rgba(30, 36, 52, .62); --surface2: rgba(44, 52, 74, .55); --line: rgba(255, 255, 255, .12);
+  --glass-strong: rgba(24, 29, 42, .82); --glass-pop: rgba(24, 29, 42, .94);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
+}
+:root[data-glass] body { background: transparent; }
+/* frost on cards, bars and banner tiles */
+:root[data-glass] .card, :root[data-glass] .game, :root[data-glass] .pog-card, :root[data-glass] .lcard,
+:root[data-glass] .banner, :root[data-glass] .weekbar, :root[data-glass] .haltbar, :root[data-glass] .syncbar,
+:root[data-glass] .banner-strip .tile { -webkit-backdrop-filter: blur(var(--blur)) saturate(1.4); backdrop-filter: blur(var(--blur)) saturate(1.4); }
+:root[data-glass] #topbar { background: var(--surface); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.4); backdrop-filter: blur(var(--blur)) saturate(1.4); }
+:root[data-glass] .banner-strip .tile { background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+:root[data-glass] .banner-strip .tile.fav { background: color-mix(in srgb, var(--tc) 14%, var(--surface)); }
+:root[data-glass] .banner-strip .tile.active { background: color-mix(in srgb, var(--tc) 18%, var(--surface)); }
+/* strongest frost: navigation bar, tables, pop-ups */
+:root[data-glass] .navpill { background: var(--glass-strong); -webkit-backdrop-filter: blur(var(--blur-strong)) saturate(1.4); backdrop-filter: blur(var(--blur-strong)) saturate(1.4); }
+:root[data-glass] .tbl th, :root[data-glass] .rk-table th { background: var(--glass-strong); }
+:root[data-glass] table.tbl, :root[data-glass] .tr-table, :root[data-glass] .rk-table { -webkit-backdrop-filter: blur(var(--blur-strong)); backdrop-filter: blur(var(--blur-strong)); }
+:root[data-glass] .tbl tr.grp td { background: var(--surface2); }
+:root[data-glass] .psearch-results, :root[data-glass] .calc-tip, :root[data-glass] .modal, :root[data-glass] .cmpbar,
+:root[data-glass] .banner-btn { background: var(--glass-pop); -webkit-backdrop-filter: blur(var(--blur-strong)); backdrop-filter: blur(var(--blur-strong)); }
